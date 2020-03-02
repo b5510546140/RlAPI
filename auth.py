@@ -17,12 +17,12 @@ def login():
 def login_post():
     print("login post")
     app = current_app._get_current_object()
-    print(request.json)
     email = request.form.get('email')
     password = request.form.get('password')
     remember = True if request.form.get('remember') else False
 
     user = User.query.filter_by(email=email).first()
+    
     data = {
         'res': 'Login suceesful',
         'isUser': True
@@ -35,9 +35,9 @@ def login_post():
             'res': 'Please check your login details and try again.',
             'isUser': False
 	    }
-
-    # if the above check passes, then we know the user has the right credentials
-    login_user(user, remember=remember)
+    else:
+        # if the above check passes, then we know the user has the right credentials
+        login_user(user, remember=remember)
 
     
     response = app.response_class(
@@ -79,7 +79,6 @@ def signup_post():
     # add the new user to the database
     db.session.add(new_user)
     db.session.commit()
-
     if new_user:
         data = {
             'status_code': 201,
