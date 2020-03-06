@@ -13,6 +13,8 @@ from tensorflow import keras
 import keras
 from keras.models import Sequential
 from keras.models import load_model
+from keras.backend import clear_session
+
 
 from .state import State
 from .agent import Agent
@@ -22,7 +24,7 @@ import time
 
 class Rl():
 
-    def trainModel(data, currencySymobol, episode_count, start_balance, training, test, model_name, log, isUpdate = False, OldmodelPath = ""):
+    def trainModel(data, currencySymobol, episode_count, start_balance, training, test, model_name, log, isUpdate = False, OldmodelPath = "",currencyAmount = -1, avgCurrencyRate = -1,gamma = 0.95 ):
 
         pd_data1_train=data[0:training]
         pd_data1_test=data[training:training+test]
@@ -52,7 +54,6 @@ class Rl():
             print("Episode " + str(e+1) + "/" + str(episode_count))
             log.log_text = log.log_text + "Episode " + str(e+1) + "/" + str(episode_count)
             db.session.commit()
-            Bal_stock1 = int(np.floor((start_balance/2)/data1_train[0]))
 
             open_cash=start_balance/2
             datasize=training
@@ -66,8 +67,16 @@ class Rl():
             agent = Agent(5)
             agent.inventory1 =[]
             open_cash_t1=open_cash
-            for i in range(Bal_stock1):
-                agent.inventory1.append(data1_train[0])
+            if currencyAmount != -1 & avgCurrencyRate != -1:
+                print("IF")
+                for i in range(currencyAmount):
+                    agent.inventory1.append(avgCurrencyRate)
+                Bal_stock1 = start_balance
+            else:
+                print("ELSE")
+                Bal_stock1 = int(np.floor((start_balance/2)/data1_train[0]))
+                for i in range(Bal_stock1):
+                    agent.inventory1.append(data1_train[0])
             Bal_stock1_t1 = len(agent.inventory1)
             
             #Timestep delta to make sure that with time reward increases for taking action
@@ -109,6 +118,7 @@ class Rl():
                         #print("In Buy stock 1")
                         buytemp = state_class_obj.open_cash/buySize
                         buyamount = np.floor(buytemp/data1_train[t])
+                        if buyamount == 0: buyamount = 1
                         # print("inven")
                         # print(len(agent.inventory1))
                         for i in range(int(buyamount)):
@@ -226,8 +236,6 @@ class Rl():
                     total_port_value.append(state_class_obj.portfolio_value)
                     total_days_played.append(t)
                     if len(agent.memory) <= batch_size:
-                        print("^_^")
-                        time.sleep(0.02)
                         agent.expReplay(len(agent.memory))
 
 
@@ -235,9 +243,7 @@ class Rl():
         #             state_class_obj.reset()
                     break
                 if len(agent.memory) > batch_size:
-                    time.sleep(0.02)
                     agent.expReplay(batch_size)
-            time.sleep(2)
             if e+1 == episode_count:
                 print("Episode"+str(episode_count))
                 filename = str(log.user_id)+"_"+str(model_name)+"_model_ep" + str(e)+".h5"
@@ -248,11 +254,11 @@ class Rl():
                         print("Delete Not Found")
                 agent.model.save("./project/modelsRl/"+filename)
                 print("Save Done")
+                clear_session()
+                # agent.clearSeassion()
         print(filename)
-        testRl(data, currencySymobol, start_balance, training, test, filename, log)
+        # Rl.testRl(data, currencySymobol, start_balance, training, test, filename, log, currencyAmount = currencyAmount, avgCurrencyRate = avgCurrencyRate)
         return filename
-
-
 
     def testRl(data, currencySymobol, start_balance, training, test, filename, log, priceLook = 'Close', currencyAmount = -1, avgCurrencyRate = -1):
         pd_data1_test=data[training:training+test].reset_index(drop=True)
@@ -362,7 +368,7 @@ class Rl():
                 # print("Total portfolio value: " + str(next_state_class_obj.portfolio_value)+ 
                     #     "  stock 1 number: " + str(len(agent.inventory1))
                     #      +"  stock 2 number: "+str(len(agent.inventory2))+"  open cash"+str(next_state_class_obj.open_cash))
-                    resultText = "Total "+ str(currencySymobol)+" in Balance "+ str(Bal_stock1) + "\n Total Open cash in episodes"+ str(open_cash)+ " \n Total Portfolio value in episodes"+ str(state_class_obj.portfolio_value+" \n Total Days in episodes"+ str(t+1))
+                    resultText = "Total "+ str(currencySymobol)+" in Balance "+ str(Bal_stock1) + "\n Total Open cash in episodes"+ str(open_cash)+ " \n Total Portfolio value in episodes"+ str(state_class_obj.portfolio_value) +" \n Total Days in episodes"+ str(t+1)
                     if log is not None:
                         log.log_text = log.log_text + resultText
                         db.session.commit()

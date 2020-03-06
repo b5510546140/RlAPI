@@ -95,9 +95,17 @@ def createModel():
         trainDay = req['trainingDay']
         testDay = req['testDay']
         if 'gamma'not in req:
-            gamma = None
+            gamma = 0.95
         else:
             gamma = req['gamma']
+        if 'currencyAmount' not in req:
+            currencyAmount = -1
+        else:
+            currencyAmount = req['currencyAmount']
+        if 'avgCurrencyRate' not in req:
+            avgCurrencyRate = -1
+        else:
+            avgCurrencyRate = req['avgCurrencyRate']  
         md = Model.query.filter_by(user_id=userId,).\
         filter_by(model_name = modelName).first()
         if md:
@@ -110,7 +118,7 @@ def createModel():
                 newLog = Log(user_id = userId, created_at = now, log_text = "")
                 db.session.add(newLog)
                 db.session.commit()
-                fileName = Rl.trainModel(data, currencySymobol, episode_count= episodeCount, start_balance=startBalance, training=trainDay, test=testDay, model_name=modelName, log=newLog)
+                fileName = Rl.trainModel(data, currencySymobol, episode_count= episodeCount, start_balance=startBalance, training=trainDay, test=testDay, model_name=modelName, log=newLog,currencyAmount = currencyAmount,avgCurrencyRate = avgCurrencyRate,gamma = gamma)
                 response = app.response_class(
                     response=json.dumps({
                         'status_code': 201,
@@ -231,9 +239,17 @@ def updateModel():
         testDay = req['testDay']
         model = Model.query.get(req['modelId'])
         if 'gamma'not in req:
-            gamma = None
+            gamma = 0.95
         else:
             gamma = req['gamma']
+        if 'currencyAmount' not in req:
+            currencyAmount = -1
+        else:
+            currencyAmount = req['currencyAmount']
+        if 'avgCurrencyRate' not in req:
+            avgCurrencyRate = -1
+        else:
+            avgCurrencyRate = req['avgCurrencyRate']  
         isParam = False
         isUpdate = False
         isNotError = True
@@ -257,7 +273,7 @@ def updateModel():
                     newLog = Log(user_id = userId, created_at = now, log_text = "")
                     db.session.add(newLog)
                     db.session.commit()
-                    fileName = Rl.trainModel(data, currencySymobol, episode_count= episodeCount, start_balance=startBalance, training=trainDay, test=testDay, model_name=modelName, log=newLog, isUpdate = isUpdate, OldmodelPath= model.model_path)
+                    fileName = Rl.trainModel(data, currencySymobol, episode_count= episodeCount, start_balance=startBalance, training=trainDay, test=testDay, model_name=modelName, log=newLog, isUpdate = isUpdate, OldmodelPath= model.model_path,currencyAmount = currencyAmount,avgCurrencyRate = avgCurrencyRate)
                     print("File Name")
                     print(fileName)
                     response = app.response_class(
