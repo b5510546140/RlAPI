@@ -33,6 +33,7 @@ class Model(db.Model,Base):
     avg_currency_rate = db.Column(db.Float)
     log_id = db.Column(db.Integer, db.ForeignKey('log.id'))
     log = db.relationship("Log")
+    model_path = db.Column(db.String(100), nullable=False)
 
 class Log(db.Model,Base):
     id = db.Column(db.Integer, primary_key=True)

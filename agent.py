@@ -9,6 +9,7 @@ import numpy as np
 import random
 from collections import deque
 
+
 class Agent:
     def __init__(self, state_size, is_eval=False, model_name=""):
         self.state_size = state_size # normalized previous days
@@ -22,7 +23,7 @@ class Agent:
         self.epsilon = 1.0 #Exploration and Exploitation — Epsilon (ε)
         self.epsilon_min = 0.01
         self.epsilon_decay = 0.995
-        self.model = load_model("models/AOT/" + model_name) if is_eval else self._model()
+        self.model = load_model("./project/modelsRl/" + model_name) if is_eval else self._model()
 
     def _model(self):
         model = Sequential()
@@ -59,7 +60,8 @@ class Agent:
 #             print("target = "+str(target))
 #             print("Done = "+str(done))
             if not done:
-#                 print("Not Done")
+                # print("Not Done")
+                # print("///////////////////////////////////")
                 target = reward + self.gamma * np.amax(self.model.predict(next_state)[0])
             target_f = self.model.predict(state)
 #             print("target_f")
