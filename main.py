@@ -200,6 +200,49 @@ def getModels():
         response.mimetype = 'application/json'
     return  response
 
+
+@main.route('/model', methods=['POST'])
+@login_required
+def getModelById():
+    req = request.get_json()
+    isParam = False
+    app = current_app._get_current_object()
+    userId = current_user.get_id()
+    if 'modelId' not in req:
+        notFoundParam = 'modelId not found'
+        isParam = True
+    else:
+        model = Model.query.get(req['modelId'])
+        if str(model.user_id) == userId:
+                    response = app.response_class(
+                        response=json.dumps({
+                            'status_code': 201,
+                            'res': {'id': model.id,'user_id' : model.user_id,'num_train_date' : model.num_train_date,'num_test_date' : model.num_test_date,'gamma' : model.gamma,'epsilon' : model.epsilon,'epsilon_min' : model.epsilon_min,'epsilon_decay' : model.epsilon_decay,'episode_count' : model.episode_count,'model_name' : model.model_name,'currency_symobol' : model.currency_symobol,'start_balance' : model.start_balance,'currency_amount' : model.currency_amount,'avg_currency_rate' : model.avg_currency_rate,'log_id' : model.log_id,'model_path' : model.model_path}
+                        }),
+                        mimetype='application/json',
+                    )
+                    response.status_code = 201
+        else :
+            response = app.response_class(
+            response=json.dumps({
+                'status_code': 401,
+                'res': {"error":"Unauthorize model"}
+            }),
+            mimetype='application/json',
+            )
+            response.status_code = 401
+
+    if isParam:
+        response = app.response_class(
+            response=json.dumps({
+                'status_code': 422,
+                'res': {"symbol":notFoundParam}
+            }),
+            mimetype='application/json',
+        )
+        response.status_code = 422
+    return  response
+
 @main.route('/updaterl', methods=['POST'])
 @login_required
 def updateModel():
