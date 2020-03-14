@@ -154,7 +154,7 @@ def createModel():
                     notFoundParam = 'Data Available' + str(len(data))
                 else: notFoundParam = "No data found, symbol may be delisted"
             else:
-                newLog = Log(user_id = userId, created_at = now, log_text = "")
+                newLog = Log(user_id = userId, created_at = now, log_text = "", train_text = "", test_text = "")
                 db.session.add(newLog)
                 db.session.commit()
                 fileName = Rl.trainModel(data, currencySymobol, episode_count= episodeCount, start_balance=startBalance, training=trainDay, test=testDay, model_name=modelName, log=newLog,currencyAmount = currencyAmount,avgCurrencyRate = avgCurrencyRate,gamma = gamma, epsilon= epsilon,epsilon_min=epsilon_min, epsilon_decay=epsilon_decay, conditions=conditions)
@@ -210,7 +210,8 @@ def getLog():
                 'status_code': 200,
                 'res': {
                     "userId":log.user_id,
-                    "data":log.log_text}
+                    "data":log.log_text,
+                    "train":log.train_text}
             }),
             mimetype='application/json',
         )
@@ -225,6 +226,47 @@ def getLog():
             mimetype='application/json',
         )
         response.status_code = 404
+    return response
+
+@main.route('/logTrain', methods=['POST'])
+@login_required
+def getLogTrain():
+    req = request.get_json()
+    isParam = False
+    app = current_app._get_current_object()
+    userId = current_user.get_id()
+    if 'modelId' not in req:
+        notFoundParam = 'modelId not found'
+        isParam = True
+    else:
+        model = Model.query.get(req['modelId'])
+        print(model.log_id)
+        log = Log.query.get(model.log_id)
+        print(log)
+        df = pd.DataFrame(columns = ["Episode","TotalPortforlio"])
+
+        if log is not None:
+            testList = log.train_text.split(',')
+            testList.pop()
+            for test in testList:
+                temp = test.split('_')
+
+                print(temp[0])
+                print(temp[1])
+                df = df.append({'Episode': temp[0],'TotalPortforlio' : temp[1]} , ignore_index=True)
+            print(df.head())
+            response = make_response(df.to_json(orient = "records"),200)
+            response.mimetype = 'application/json'
+        else:
+            response = app.response_class(
+                response=json.dumps({
+                    'status_code': 404,
+                    'res': {
+                        "error":'Not Found'}
+                }),
+                mimetype='application/json',
+            )
+            response.status_code = 404
     return response
 
 
@@ -393,6 +435,16 @@ def updateModel():
         isParam = False
         isUpdate = False
         isNotError = True
+        if model is None:
+            response = app.response_class(
+            response=json.dumps({
+                'status_code': 404,
+                'res': {"error":"Not found Model"}
+            }),
+            mimetype='application/json',
+            )
+            response.status_code = 404
+            return response
         if str(model.user_id) == userId:
             if str(model.model_name) == modelName:
                 Log.query.filter(Log.id == model.log_id).delete()
@@ -419,7 +471,7 @@ def updateModel():
                 if len(data) < trainDay + testDay:
                     notFoundParam = 'train and testDay more than data ' + str(len(data))
                 else:
-                    newLog = Log(user_id = userId, created_at = now, log_text = "")
+                    newLog = Log(user_id = userId, created_at = now, log_text = "", train_text = "", test_text = "")
                     db.session.add(newLog)
                     db.session.commit()
                     fileName = Rl.trainModel(data, currencySymobol, episode_count= episodeCount, start_balance=startBalance, training=trainDay, test=testDay, model_name=modelName, log=newLog, isUpdate = isUpdate, OldmodelPath= model.model_path,currencyAmount = currencyAmount,avgCurrencyRate = avgCurrencyRate,gamma = gamma, epsilon= epsilon,epsilon_min=epsilon_min, epsilon_decay=epsilon_decay, conditions=conditions)

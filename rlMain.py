@@ -351,6 +351,7 @@ class Rl():
                     print("Total portfolio value: " + str(next_state_class_obj.portfolio_value)+ "  stock 1 number: " + str(len(agent.inventory1)))
                     # print(agent.inventory1)
                     #      +"  stock 2 number: "+str(len(agent.inventory2))+"  open cash"+str(next_state_class_obj.open_cash))
+                    log.train_text = log.train_text +str(e+1)+"_" +str(next_state_class_obj.portfolio_value)+","
                     total_Prof.append(total_profit)
                     total_stock1bal.append(len(agent.inventory1))
         #             total_stock2bal.append(len(agent.inventory2))

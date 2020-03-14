@@ -44,6 +44,8 @@ class Log(db.Model,Base):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     created_at = db.Column(db.DateTime)
     log_text = db.Column(db.String(1000))
+    train_text = db.Column(db.String(1000))
+    test_text = db.Column(db.String(1000))
 
 class Policy(db.Model,Base):
     id = db.Column(db.Integer, primary_key=True)
