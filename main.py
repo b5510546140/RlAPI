@@ -9,10 +9,12 @@ from .rlMain import Rl
 from .models import Log
 from .models import Model
 from .models import User
+from .models import Policy
 from . import db
 
 import yfinance as yf
 import datetime
+
 
 
 
@@ -51,7 +53,22 @@ def getData():
         currencySymobol = req['symbol']
         startDate = req['startDate']
         endDate = req['endDate']
-        data = yf.download(currencySymobol, start=startDate, end=endDate).reset_index()
+        try:
+            data = yf.download(currencySymobol, start=startDate, end=endDate).reset_index()
+        except:
+            print("No data found, symbol may be delisted")
+            data = []
+        if len(data) == 0:
+            notFoundParam = "No data found, symbol may be delisted"
+            response = app.response_class(
+                response=json.dumps({
+                    'status_code': 422,
+                    'res': {"symbol":notFoundParam}
+                }),
+                mimetype='application/json',
+            )
+            response.status_code = 422
+            return response
         del data['Adj Close']
         del data['Volume']
         data['Date'] = data['Date'].dt.strftime('%Y-%m-%d')
@@ -98,27 +115,49 @@ def createModel():
             gamma = 0.95
         else:
             gamma = req['gamma']
-        if 'currencyAmount' not in req:
+        if 'epsilon'not in req:
+            epsilon = 1.0
+        else:
+            epsilon = req['epsilon']
+        if 'epsilon_min'not in req:
+            epsilon_min = 0.01
+        else:
+            epsilon_min = req['epsilon_min']
+        if 'epsilon_decay'not in req:
+            epsilon_decay = 0.995
+        else:
+            epsilon_decay = req['epsilon_decay']
+        if 'currencyAmount' not in req or req['currencyAmount'] is None:
             currencyAmount = -1
         else:
             currencyAmount = req['currencyAmount']
-        if 'avgCurrencyRate' not in req:
+        if 'avgCurrencyRate' not in req or req['avgCurrencyRate'] is None :
             avgCurrencyRate = -1
         else:
             avgCurrencyRate = req['avgCurrencyRate']  
+        if 'conditions' not in req:
+            conditions = []
+        else:
+            conditions = req['conditions']  
         md = Model.query.filter_by(user_id=userId,).\
         filter_by(model_name = modelName).first()
         if md:
             notFoundParam = 'modelName already exist'
         else :
-            data = yf.download(currencySymobol, start=startDate, end=endDate).reset_index()
+            try:
+                data = yf.download(currencySymobol, start=startDate, end=endDate).reset_index()
+            except:
+                print("No data found, symbol may be delisted")
+                data = []
             if len(data) < trainDay + testDay:
-                notFoundParam = 'train and testDay more than data ' + str(len(data))
+                if len(data) > 0:
+                    notFoundParam = 'Data Available' + str(len(data))
+                else: notFoundParam = "No data found, symbol may be delisted"
             else:
                 newLog = Log(user_id = userId, created_at = now, log_text = "")
                 db.session.add(newLog)
                 db.session.commit()
-                fileName = Rl.trainModel(data, currencySymobol, episode_count= episodeCount, start_balance=startBalance, training=trainDay, test=testDay, model_name=modelName, log=newLog,currencyAmount = currencyAmount,avgCurrencyRate = avgCurrencyRate,gamma = gamma)
+                fileName = Rl.trainModel(data, currencySymobol, episode_count= episodeCount, start_balance=startBalance, training=trainDay, test=testDay, model_name=modelName, log=newLog,currencyAmount = currencyAmount,avgCurrencyRate = avgCurrencyRate,gamma = gamma, epsilon= epsilon,epsilon_min=epsilon_min, epsilon_decay=epsilon_decay, conditions=conditions)
                 response = app.response_class(
                     response=json.dumps({
                         'status_code': 201,
@@ -128,8 +167,18 @@ def createModel():
                 )
                 response.status_code = 201
                 isParam = False
-                new_Rlmodel = Model(user_id = userId, created_at = now, num_train_date = trainDay, num_test_date = testDay,episode_count = episodeCount ,model_name = modelName, currency_symobol = currencySymobol, log_id = newLog.id, model_path = fileName,  start_balance=startBalance, gamma = gamma)
+                newstartDate = datetime.datetime.strptime(startDate, '%Y-%m-%d').date()
+                newendDate = datetime.datetime.strptime(endDate, '%Y-%m-%d').date()
+                if currencyAmount == -1: currencyAmount = None
+                if avgCurrencyRate == -1: avgCurrencyRate = None
+                new_Rlmodel = Model(user_id = userId, created_at = now, num_train_date = trainDay, num_test_date = testDay,episode_count = episodeCount ,model_name = modelName, currency_symobol = currencySymobol, log_id = newLog.id, model_path = fileName,  start_balance=startBalance, currency_amount = currencyAmount,avg_currency_rate = avgCurrencyRate, gamma = gamma, epsilon= epsilon, epsilon_min=epsilon_min, epsilon_decay=epsilon_decay, start_date= newstartDate,end_date = newendDate, have_model = True)
                 db.session.add(new_Rlmodel)
+                db.session.commit()
+                md = Model.query.filter_by(user_id=userId,).\
+                filter_by(model_name = modelName).first()
+                for condition in conditions:
+                    new_condition = Policy(model_id= md.id,created_at = now, action = condition["action"], con = condition["con"], sym = condition["sym"], num = condition["num"])
+                    db.session.add(new_condition)
                 db.session.commit()
     if isParam:
         response = app.response_class(
@@ -200,6 +249,35 @@ def getModels():
         response.mimetype = 'application/json'
     return  response
 
+@main.route('/policy', methods=['POST'])
+@login_required
+def getPolicy():
+    req = request.get_json()
+    isParam = False
+    app = current_app._get_current_object()
+    userId = current_user.get_id()
+    if 'modelId' not in req:
+        notFoundParam = 'modelId not found'
+        response = app.response_class(
+            response=json.dumps({
+                'status_code': 422,
+                'res': {"symbol":notFoundParam}
+            }),
+            mimetype='application/json',
+        )
+        response.status_code = 422
+    else:
+        policys = Policy.query.filter_by(model_id=req['modelId']).all()
+        df = pd.DataFrame(columns = ["id","model_id","action","con","sym","num"])
+        if len(policys) > 0:
+            for policy in policys:
+                df = df.append({'id': policy.id,'model_id' : policy.model_id,'action':policy.action,'con':policy.con,'sym':policy.sym,'num':policy.num} , ignore_index=True)
+            response = make_response(df.to_json(orient = "records"),200)
+            response.mimetype = 'application/json'
+        else:
+            response = make_response(df.to_json(orient = "records"),404)
+            response.mimetype = 'application/json'
+    return  response
 
 @main.route('/model', methods=['POST'])
 @login_required
@@ -213,11 +291,14 @@ def getModelById():
         isParam = True
     else:
         model = Model.query.get(req['modelId'])
+        if model.currency_amount == -1: model.currency_amount = None
+        if model.avg_currency_rate == -1: model.avg_currency_rate = None
+
         if str(model.user_id) == userId:
                     response = app.response_class(
                         response=json.dumps({
                             'status_code': 201,
-                            'res': {'id': model.id,'user_id' : model.user_id,'num_train_date' : model.num_train_date,'num_test_date' : model.num_test_date,'gamma' : model.gamma,'epsilon' : model.epsilon,'epsilon_min' : model.epsilon_min,'epsilon_decay' : model.epsilon_decay,'episode_count' : model.episode_count,'model_name' : model.model_name,'currency_symobol' : model.currency_symobol,'start_balance' : model.start_balance,'currency_amount' : model.currency_amount,'avg_currency_rate' : model.avg_currency_rate,'log_id' : model.log_id,'model_path' : model.model_path}
+                            'res': {'id': model.id,'user_id' : model.user_id,'num_train_date' : model.num_train_date,'num_test_date' : model.num_test_date,'gamma' : model.gamma,'epsilon' : model.epsilon,'epsilon_min' : model.epsilon_min,'epsilon_decay' : model.epsilon_decay,'episode_count' : model.episode_count,'model_name' : model.model_name,'currency_symobol' : model.currency_symobol,'start_balance' : model.start_balance,'currency_amount' : model.currency_amount,'avg_currency_rate' : model.avg_currency_rate,'log_id' : model.log_id,'model_path' : model.model_path, 'start_date': model.start_date.strftime('%Y-%m-%d'), 'end_date':model.end_date.strftime('%Y-%m-%d')}
                         }),
                         mimetype='application/json',
                     )
@@ -285,20 +366,36 @@ def updateModel():
             gamma = 0.95
         else:
             gamma = req['gamma']
-        if 'currencyAmount' not in req:
+        if 'epsilon'not in req:
+            epsilon = 1.0
+        else:
+            epsilon = req['epsilon']
+        if 'epsilon_min'not in req:
+            epsilon_min = 0.01
+        else:
+            epsilon_min = req['epsilon_min']
+        if 'epsilon_decay'not in req:
+            epsilon_decay = 0.995
+        else:
+            epsilon_decay = req['epsilon_decay']
+        if 'currencyAmount' not in req or req['currencyAmount'] is None:
             currencyAmount = -1
         else:
             currencyAmount = req['currencyAmount']
-        if 'avgCurrencyRate' not in req:
+        if 'avgCurrencyRate' not in req or req['avgCurrencyRate'] is None :
             avgCurrencyRate = -1
         else:
             avgCurrencyRate = req['avgCurrencyRate']  
+        if 'conditions' not in req:
+            conditions = []
+        else:
+            conditions = req['conditions']
         isParam = False
         isUpdate = False
         isNotError = True
         if str(model.user_id) == userId:
-            Log.query.filter(Log.id == model.log_id).delete()
             if str(model.model_name) == modelName:
+                Log.query.filter(Log.id == model.log_id).delete()
                 isUpdate = True
             else :
                 md = Model.query.filter_by(user_id=userId,).\
@@ -309,16 +406,23 @@ def updateModel():
                     isNotError = False
 
             if isNotError:
+                try:
+                    data = yf.download(currencySymobol, start=startDate, end=endDate).reset_index()
+                except:
+                    print("No data found, symbol may be delisted")
+                    data = []
+                if len(data) < trainDay + testDay:
+                    notFoundParam = 'Data Available' + str(len(data))
+                else: notFoundParam = "No data found, symbol may be delisted"
                 data = yf.download(currencySymobol, start=startDate, end=endDate).reset_index()
+                
                 if len(data) < trainDay + testDay:
                     notFoundParam = 'train and testDay more than data ' + str(len(data))
                 else:
                     newLog = Log(user_id = userId, created_at = now, log_text = "")
                     db.session.add(newLog)
                     db.session.commit()
-                    fileName = Rl.trainModel(data, currencySymobol, episode_count= episodeCount, start_balance=startBalance, training=trainDay, test=testDay, model_name=modelName, log=newLog, isUpdate = isUpdate, OldmodelPath= model.model_path,currencyAmount = currencyAmount,avgCurrencyRate = avgCurrencyRate)
-                    print("File Name")
-                    print(fileName)
+                    fileName = Rl.trainModel(data, currencySymobol, episode_count= episodeCount, start_balance=startBalance, training=trainDay, test=testDay, model_name=modelName, log=newLog, isUpdate = isUpdate, OldmodelPath= model.model_path,currencyAmount = currencyAmount,avgCurrencyRate = avgCurrencyRate,gamma = gamma, epsilon= epsilon,epsilon_min=epsilon_min, epsilon_decay=epsilon_decay, conditions=conditions)
                     response = app.response_class(
                         response=json.dumps({
                             'status_code': 201,
@@ -327,6 +431,10 @@ def updateModel():
                         mimetype='application/json',
                     )
                     response.status_code = 201
+                    newstartDate = datetime.datetime.strptime(startDate, '%Y-%m-%d').date()
+                    newendDate = datetime.datetime.strptime(endDate, '%Y-%m-%d').date()
+                    if currencyAmount == -1: currencyAmount = None
+                    if avgCurrencyRate == -1: avgCurrencyRate = None
                     if isUpdate:
                         model.updated_at = now
                         model.num_train_date = trainDay
@@ -336,10 +444,33 @@ def updateModel():
                         model.log_id = newLog.id # Todo delete old log
                         model.model_path = fileName
                         model.start_balance=startBalance
+                        model.currency_amount = currencyAmount
+                        model.avg_currency_rate = avgCurrencyRate
+                        model.gamma = gamma
+                        model.epsilon = epsilon
+                        model.epsilon_min = epsilon_min
+                        model.epsilon_decay = epsilon_decay
+                        model.start_date = startDate
+                        model.end_date = endDate
+                        model.have_model = True
+                        model.start_date = newstartDate
+                        model.end_date = newendDate
+
+                        Policy.query.filter(Policy.model_id == model.id).delete()
+                        for condition in conditions:
+                            new_condition = Policy(model_id= model.id,created_at = now, action = condition["action"], con = condition["con"], sym = condition["sym"], num = condition["num"])
+                            db.session.add(new_condition)
+                        db.session.commit()
                     else:
-                        new_Rlmodel = Model(user_id = userId, created_at = now, num_train_date = trainDay, num_test_date = testDay,episode_count = episodeCount ,model_name = modelName, currency_symobol = currencySymobol, log_id = newLog.id, model_path = fileName, start_balance=startBalance)
+                        new_Rlmodel = Model(user_id = userId, created_at = now, num_train_date = trainDay, num_test_date = testDay,episode_count = episodeCount ,model_name = modelName, currency_symobol = currencySymobol, log_id = newLog.id, model_path = fileName,  start_balance=startBalance, currency_amount = currencyAmount,avg_currency_rate = avgCurrencyRate,gamma = gamma, epsilon= epsilon, epsilon_min=epsilon_min, epsilon_decay=epsilon_decay,start_date= newstartDate,end_date = newendDate, have_model = True)
                         db.session.add(new_Rlmodel)
-                    db.session.commit()
+                        db.session.commit()
+                        md = Model.query.filter_by(user_id=userId,).\
+                        filter_by(model_name = modelName).first()
+                        for condition in conditions:
+                            new_condition = Policy(model_id= md.id,created_at = now, action = condition["action"], con = condition["con"], sym = condition["sym"], num = condition["num"])
+                            db.session.add(new_condition)
+                        db.session.commit()
         else :
             response = app.response_class(
             response=json.dumps({
@@ -379,6 +510,8 @@ def delModel():
     else:
         modelId = req['modelId']
         model = Model.query.filter_by(id = modelId).first()
+        print(modelId)
+        print(userId)
         if str(model.user_id) == str(userId):
             Model.query.filter_by(user_id=userId).\
         filter_by(id = modelId).delete()

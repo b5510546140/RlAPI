@@ -11,7 +11,7 @@ from collections import deque
 
 
 class Agent:
-    def __init__(self, state_size, is_eval=False, model_name=""):
+    def __init__(self, state_size, is_eval=False, model_name="",gamma = 0.95,epsilon = 1.0, epsilon_min = 0.01, epsilon_decay = 0.995):
         self.state_size = state_size # normalized previous days
         self.action_size = 3 #  buy_1, sell_1,DO Nothing
         self.memory = deque(maxlen=2000)
@@ -19,10 +19,10 @@ class Agent:
         self.inventory2 = []
         self.model_name = model_name
         self.is_eval = is_eval
-        self.gamma = 0.95 #gamma is the discount factor. It quantifies how much importance we give for future rewards.
-        self.epsilon = 1.0 #Exploration and Exploitation — Epsilon (ε)
-        self.epsilon_min = 0.01
-        self.epsilon_decay = 0.995
+        self.gamma = gamma #gamma is the discount factor. It quantifies how much importance we give for future rewards.
+        self.epsilon = epsilon #Exploration and Exploitation — Epsilon (ε)
+        self.epsilon_min = epsilon_min
+        self.epsilon_decay = epsilon_decay
         self.model = load_model("./project/modelsRl/" + model_name) if is_eval else self._model()
 
     def _model(self):

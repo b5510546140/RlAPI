@@ -20,17 +20,15 @@ from .state import State
 from .agent import Agent
 import project.function as fc
 import time 
+import operator
 
 
 class Rl():
 
-    def trainModel(data, currencySymobol, episode_count, start_balance, training, test, model_name, log, isUpdate = False, OldmodelPath = "",currencyAmount = -1, avgCurrencyRate = -1,gamma = 0.95 ):
+    def trainModel(data, currencySymobol, episode_count, start_balance, training, test, model_name, log, isUpdate = False, OldmodelPath = "",currencyAmount = -1, avgCurrencyRate = -1,gamma = 0.95, epsilon = 1.0, epsilon_min = 0.01, epsilon_decay = 0.995, conditions = []):
 
         pd_data1_train=data[0:training]
         pd_data1_test=data[training:training+test]
-        
-        # total_Prof=[]
-        # done=False
 
         Act_datasize = test
         batch_size = 64
@@ -48,6 +46,24 @@ class Rl():
         total_port_value=[]
         total_days_played=[]
 
+        buyPolicy = []
+        sellPolicy = []
+        holdPolicy = []
+        if len(conditions) > 0: 
+            isPolicy = True 
+            ops = { ">": operator.gt, "<": operator.lt, "=": operator.eq, ">=": operator.ge, "<=": operator.le }
+            for condition in conditions:
+                print(condition["action"])
+                if condition["action"] == "buy":
+                    buyPolicy.append(condition)
+                elif condition["action"] == "sell":
+                    sellPolicy.append(condition)
+                elif condition["action"] == "hold":
+                    holdPolicy.append(condition)
+                
+        else: isPolicy = False
+
+
 
         for e in range(episode_count):
             print("..........")
@@ -62,23 +78,28 @@ class Rl():
             reward = 0
             buySize = 50
             maxSize = 100
-            
+            totalInven = 0
+            avgInven = -1
             #Initialize Agent
-            agent = Agent(5)
+            print(gamma)
+            agent = Agent(5, gamma = gamma, epsilon= epsilon, epsilon_min=epsilon_min, epsilon_decay=epsilon_decay)
             agent.inventory1 =[]
             open_cash_t1=open_cash
-            if currencyAmount != -1 & avgCurrencyRate != -1:
-                print("IF")
+            if currencyAmount == 0: currencyAmount = -1
+            if avgCurrencyRate == 0: avgCurrencyRate = -1
+            if currencyAmount != -1 and avgCurrencyRate != -1:
                 for i in range(currencyAmount):
                     agent.inventory1.append(avgCurrencyRate)
+                    totalInven = totalInven + avgCurrencyRate
                 Bal_stock1 = start_balance
             else:
-                print("ELSE")
                 Bal_stock1 = int(np.floor((start_balance/2)/data1_train[0]))
                 for i in range(Bal_stock1):
                     agent.inventory1.append(data1_train[0])
+                    totalInven = totalInven + data1_train[0]
             Bal_stock1_t1 = len(agent.inventory1)
-            
+            print(Bal_stock1_t1)
+            avgInven = totalInven/Bal_stock1_t1
             #Timestep delta to make sure that with time reward increases for taking action
             #timestep_delta=0
             
@@ -119,27 +140,59 @@ class Rl():
                         buytemp = state_class_obj.open_cash/buySize
                         buyamount = np.floor(buytemp/data1_train[t])
                         if buyamount == 0: buyamount = 1
-                        # print("inven")
-                        # print(len(agent.inventory1))
                         for i in range(int(buyamount)):
                             agent.inventory1.append(data1_train[t])
+                            totalInven = totalInven + data1_train[t]
                         # print(len(agent.inventory1))
                         Bal_stock1_t1= len(agent.inventory1)
+                        avgInven = totalInven/Bal_stock1_t1
                         open_cash_t1=state_class_obj.open_cash-state_class_obj.Stock1Price * buyamount #Here we are buying 1 stock
                         buySize = buySize - 1
                         #needs to be reviewed
                         if(state_class_obj.open_cash<500):
                             reward=-1000
-                        elif (state_class_obj.Stock1Price > state_class_obj.fiveday_stock1):
-                            reward=abs(state_class_obj.Stock1Price - state_class_obj.fiveday_stock1)/state_class_obj.fiveday_stock1*100
-                            # if(Bal_stock1_t1 == 1):
-                            #     reward = 30000
-                        else:  
-                            reward=-abs(change_percent_stock1)*100
-        #                 elif (abs(change_percent_stock1)<=2):
-        #                     reward=-10000
-        #                 else:  
-        #                     reward=-change_percent_stock1*100
+                        else:
+                            isBuyDeafault = True
+                            if isPolicy and len(buyPolicy) > 0:
+                                isBuyDeafault = False
+                                opera = buyPolicy[0]["con"]
+                                sym = buyPolicy[0]["sym"]
+                                num = float(buyPolicy[0]["num"])
+                                if sym == 'ma':
+                                    averageXday = Rl.ma_x_day_window(data1_train, t, num)
+                                    if ops[opera](state_class_obj.Stock1Price ,averageXday):
+                                        reward=abs(state_class_obj.Stock1Price - averageXday)/averageXday*100
+                                    else:
+                                        # Might change Change percent Stock
+                                        reward=-abs(change_percent_stock1)*100
+                                elif sym == 'profit':
+                                    percentproit = (state_class_obj.Stock1Price - avgInven)/avgInven * 100
+                                    if ops[opera](percentproit ,num):
+                                        reward= abs(percentproit)*100
+                                    else:
+                                        reward= -abs(percentproit)*100
+                                elif sym == 'change':
+                                    averageOneDay = Rl.ma_x_day_window(data1_train, t, 1)
+                                    changePercent = (state_class_obj.Stock1Price-averageOneDay)/averageOneDay*100
+                                    if ops[opera](changePercent ,num):
+                                        reward= abs(changePercent)*100
+                                    else:
+                                        reward= -abs(changePercent)*100
+                                elif sym == 'change5':
+                                    if ops[opera](change_percent_stock1 ,num):
+                                        reward= abs(change_percent_stock1)*100
+                                    else:
+                                        reward= -abs(change_percent_stock1)*100
+                                else: #Default same as below
+                                    isBuyDeafault = True
+
+                            if isBuyDeafault:
+                                print("Default for Buy")
+                                if state_class_obj.Stock1Price > state_class_obj.fiveday_stock1:
+                          
+                                    reward=abs(state_class_obj.Stock1Price - state_class_obj.fiveday_stock1)/state_class_obj.fiveday_stock1*100
+                                else:  
+                                    reward=-abs(change_percent_stock1)*100
                         
 
                        
@@ -155,11 +208,14 @@ class Rl():
                         sellSize = maxSize - buySize
                         buySize = buySize + 1
                         tempSale = np.floor(Bal_stock1_t1 / sellSize)
+                        if tempSale == 0: tempSale = 1
                         TotalBought = 0
                         for j in range(int(tempSale)):
                             bought_price1 = agent.inventory1.pop(0)
                             TotalBought = TotalBought + bought_price1
+                            totalInven = totalInven - avgInven
                         Bal_stock1_t1= len(agent.inventory1)
+                        avgInven = totalInven/Bal_stock1_t1
                         open_cash_t1 = state_class_obj.open_cash + (state_class_obj.Stock1Price * tempSale) #State[0] is the price of stock 1. Here we are buying 1 stoc
                   
                         # Need to be review
@@ -168,16 +224,82 @@ class Rl():
                         if (abs(change_percent_stock1)<=1):
                             reward=-abs(change_percent_stock1)*100
                         else:
-                            reward=change_percent_stock1*100 #State[0] is the price of stock 1. Here we are buying 1 stock
-                        
-                        total_profit += (tempSale * data1_train[t]) - TotalBought
+                            
+                            isSellDeafault = True
+                            if isPolicy and len(sellPolicy) > 0:
+                                isSellDeafault = False
+                                opera = sellPolicy[0]["con"]
+                                sym = sellPolicy[0]["sym"]
+                                num = float(sellPolicy[0]["num"])
+                                if sym == 'ma':
+                                    averageXday = Rl.ma_x_day_window(data1_train, t, num)
+                                    if ops[opera](state_class_obj.Stock1Price ,averageXday):
+                                        reward=abs(state_class_obj.Stock1Price - averageXday)/averageXday*100
+                                    else:
+                                        # Might change Change percent Stock
+                                        reward=-abs(change_percent_stock1)*100
+                                elif sym == 'profit':
+                                    percentproit = (state_class_obj.Stock1Price - avgInven)/avgInven * 100
+                                    if ops[opera](percentproit ,num):
+                                        reward= abs(percentproit)*100
+                                    else:
+                                        reward= -abs(percentproit)*100
+                                elif sym == 'change':
+                                    averageOneDay = Rl.ma_x_day_window(data1_train, t, 1)
+                                    changePercent = (state_class_obj.Stock1Price-averageOneDay)/averageOneDay*100
+                                    if ops[opera](changePercent ,num):
+                                        reward= abs(changePercent)*100
+                                    else:
+                                        reward= -abs(changePercent)*100
+                                elif sym == 'change5':
+                                    if ops[opera](change_percent_stock1 ,num):
+                                        reward= abs(change_percent_stock1)*100
+                                    else:
+                                        reward= -abs(change_percent_stock1)*100
+                                else: #Default same as below
+                                    isSellDeafault = True
+
+                            if isSellDeafault:
+                                reward=change_percent_stock1*100 #State[0] is the price of stock 1. Here we are buying 1 stock
+                    total_profit += (tempSale * data1_train[t]) - TotalBought
                     #print("reward for sell stock1 " + str(reward))
                         
-                
-
-
-        #        TODO Config logic in this Action 
                 if action == 2:             # Do nothing action    
+                    isHoldDeafault = True
+                    if isPolicy and len(holdPolicy) > 0:
+                        isHoldDeafault = False
+                        opera = holdPolicy[0]["con"]
+                        sym = holdPolicy[0]["sym"]
+                        num = float(holdPolicy[0]["num"])
+                        if sym == 'ma':
+                            averageXday = Rl.ma_x_day_window(data1_train, t, num)
+                            if ops[opera](state_class_obj.Stock1Price ,averageXday):
+                                reward=abs(state_class_obj.Stock1Price - averageXday)/averageXday*100
+                            else:
+                                # Might change Change percent Stock
+                                reward=-abs(change_percent_stock1)*100
+                        elif sym == 'profit':
+                            percentproit = (state_class_obj.Stock1Price - avgInven)/avgInven * 100
+                            if ops[opera](percentproit ,num):
+                                reward= abs(percentproit)*100
+                            else:
+                                reward= -abs(percentproit)*100
+                        elif sym == 'change':
+                            averageOneDay = Rl.ma_x_day_window(data1_train, t, 1)
+                            changePercent = (state_class_obj.Stock1Price-averageOneDay)/averageOneDay*100
+                            if ops[opera](changePercent ,num):
+                                reward= abs(changePercent)*100
+                            else:
+                                reward= -abs(changePercent)*100
+                        elif sym == 'change5':
+                            if ops[opera](change_percent_stock1 ,num):
+                                reward= abs(change_percent_stock1)*100
+                            else:
+                                reward= -abs(change_percent_stock1)*100
+                        else: #Default same as below
+                            isHoldDeafault = True
+
+                    if isHoldDeafault:
                         if (abs(change_percent_stock1)<=2):
                             reward=100
                         elif (state_class_obj.open_cash<0.1*start_balance):
@@ -257,7 +379,7 @@ class Rl():
                 clear_session()
                 # agent.clearSeassion()
         print(filename)
-        # Rl.testRl(data, currencySymobol, start_balance, training, test, filename, log, currencyAmount = currencyAmount, avgCurrencyRate = avgCurrencyRate)
+        Rl.testRl(data, currencySymobol, start_balance, training, test, filename, log, currencyAmount = currencyAmount, avgCurrencyRate = avgCurrencyRate)
         return filename
 
     def testRl(data, currencySymobol, start_balance, training, test, filename, log, priceLook = 'Close', currencyAmount = -1, avgCurrencyRate = -1):
@@ -380,6 +502,7 @@ class Rl():
                     print("Total Days in episodes"+ str(t+1))
 
                     print("--------------------------------")
+                    clear_session()
                     break
         return resultText
             
@@ -428,4 +551,16 @@ class Rl():
             actionName = "Sell"
         else:
             actionName = "Hold"
+
+        clear_session()
         return actionName
+
+    def ma_x_day_window(data, timestep, x):
+        day = int(np.floor(x))
+        step = timestep
+        if step < day:
+            return data[0]
+        
+        stock_xdays = np.mean(data[step-day:step])
+
+        return stock_xdays

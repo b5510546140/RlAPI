@@ -19,6 +19,8 @@ class Model(db.Model,Base):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     created_at = db.Column(db.DateTime)
     updated_at = db.Column(db.DateTime)
+    start_date = db.Column(db.DateTime)
+    end_date = db.Column(db.DateTime)
     num_train_date = db.Column(db.Integer, nullable=False)
     num_test_date = db.Column(db.Integer, nullable=False)
     gamma = db.Column(db.Float)
@@ -33,10 +35,21 @@ class Model(db.Model,Base):
     avg_currency_rate = db.Column(db.Float)
     log_id = db.Column(db.Integer, db.ForeignKey('log.id'))
     log = db.relationship("Log")
+    policy = db.relationship('Policy', backref='model', lazy=True)
     model_path = db.Column(db.String(100), nullable=False)
+    have_model = db.Column(db.Boolean)
 
 class Log(db.Model,Base):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     created_at = db.Column(db.DateTime)
     log_text = db.Column(db.String(1000))
+
+class Policy(db.Model,Base):
+    id = db.Column(db.Integer, primary_key=True)
+    model_id = db.Column(db.Integer, db.ForeignKey('model.id'), nullable=False)
+    created_at = db.Column(db.DateTime)
+    action = db.Column(db.String(10))
+    con = db.Column(db.String(3))
+    sym = db.Column(db.String(15))
+    num = db.Column(db.Integer)
