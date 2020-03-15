@@ -279,10 +279,10 @@ def getModels():
     models = Model.query.filter_by(user_id=userId).\
         order_by(db.desc(Model.created_at)).all()
     print(len(models))
-    df = pd.DataFrame(columns = ["id","user_id","created_at","updated_at","num_train_date","num_test_date","gamma","epsilon","epsilon_min","epsilon_decay","episode_count","model_name","currency_symobol","start_balance","currency_amount","avg_currency_rate","log_id","model_path"])
+    df = pd.DataFrame(columns = ["id","user_id","created_at","updated_at","num_train_date","num_test_date","gamma","epsilon","epsilon_min","epsilon_decay","episode_count","model_name","currency_symobol","start_balance","currency_amount","avg_currency_rate","log_id","model_path","have_model"])
     if len(models) > 0:
         for model in models:
-            df = df.append({'id': model.id,'user_id' : model.user_id,'created_at' : model.created_at,'updated_at' : model.updated_at,'num_train_date' : model.num_train_date,'num_test_date' : model.num_test_date,'gamma' : model.gamma,'epsilon' : model.epsilon,'epsilon_min' : model.epsilon_min,'epsilon_decay' : model.epsilon_decay,'episode_count' : model.episode_count,'model_name' : model.model_name,'currency_symobol' : model.currency_symobol,'start_balance' : model.start_balance,'currency_amount' : model.currency_amount,'avg_currency_rate' : model.avg_currency_rate,'log_id' : model.log_id,'model_path' : model.model_path} , ignore_index=True)
+            df = df.append({'id': model.id,'user_id' : model.user_id,'created_at' : model.created_at,'updated_at' : model.updated_at,'num_train_date' : model.num_train_date,'num_test_date' : model.num_test_date,'gamma' : model.gamma,'epsilon' : model.epsilon,'epsilon_min' : model.epsilon_min,'epsilon_decay' : model.epsilon_decay,'episode_count' : model.episode_count,'model_name' : model.model_name,'currency_symobol' : model.currency_symobol,'start_balance' : model.start_balance,'currency_amount' : model.currency_amount,'avg_currency_rate' : model.avg_currency_rate,'log_id' : model.log_id,'model_path' : model.model_path, 'have_model':model.have_model} , ignore_index=True)
 
         response = make_response(df.to_json(orient = "records"),200)
         response.mimetype = 'application/json'
@@ -726,3 +726,151 @@ def predictModel():
     )
     response.status_code = 422
     return response
+
+
+@main.route('/saverl', methods=['POST'])
+@login_required
+def saveModel():
+    req = request.get_json()
+    app = current_app._get_current_object()
+    isParam = True
+    userId = current_user.get_id()
+    now = datetime.datetime.now()
+    notFoundParam = ''
+
+    if 'modelId' not in req:
+        notFoundParam = 'modelId not found'
+    elif 'startDate' not in req:
+        notFoundParam = 'startDate not found'
+    elif 'endDate'not in req:
+        notFoundParam = 'endDate not found'
+    elif 'symbol'not in req:
+        notFoundParam = 'symbol not found'
+    elif 'modelName'not in req:
+        notFoundParam = 'modelName not found'
+    elif 'startBalance'not in req:
+        notFoundParam = 'startBalance not found'
+    elif 'episodeCount'not in req:
+        notFoundParam = 'episodeCount not found'
+    elif 'trainingDay'not in req:
+        notFoundParam = 'trainingDay not found'
+    elif 'testDay'not in req:
+        notFoundParam = 'testDay not found'
+    else:
+        currencySymobol = req['symbol']
+        startDate = req['startDate']
+        endDate = req['endDate']
+        modelName = req['modelName']
+        startBalance = req['startBalance']
+        episodeCount = req['episodeCount']
+        trainDay = req['trainingDay']
+        testDay = req['testDay']
+        model = Model.query.get(req['modelId'])
+        if 'gamma'not in req:
+            gamma = 0.95
+        else:
+            gamma = req['gamma']
+        if 'epsilon'not in req:
+            epsilon = 1.0
+        else:
+            epsilon = req['epsilon']
+        if 'epsilon_min'not in req:
+            epsilon_min = 0.01
+        else:
+            epsilon_min = req['epsilon_min']
+        if 'epsilon_decay'not in req:
+            epsilon_decay = 0.995
+        else:
+            epsilon_decay = req['epsilon_decay']
+        if 'currencyAmount' not in req or req['currencyAmount'] is None:
+            currencyAmount = -1
+        else:
+            currencyAmount = req['currencyAmount']
+        if 'avgCurrencyRate' not in req or req['avgCurrencyRate'] is None :
+            avgCurrencyRate = -1
+        else:
+            avgCurrencyRate = req['avgCurrencyRate']  
+        if 'conditions' not in req:
+            conditions = []
+        else:
+            conditions = req['conditions']
+        isParam = False
+        isUpdate = False
+        isNotError = True
+        if model is None:
+            response = app.response_class(
+            response=json.dumps({
+                'status_code': 404,
+                'res': {"error":"Not found Model"}
+            }),
+            mimetype='application/json',
+            )
+            response.status_code = 404
+            return response
+        if str(model.user_id) == str(userId):
+            if str(model.model_name) == modelName:
+                newstartDate = datetime.datetime.strptime(startDate, '%Y-%m-%d').date()
+                newendDate = datetime.datetime.strptime(endDate, '%Y-%m-%d').date()
+                if currencyAmount == -1: currencyAmount = None
+                if avgCurrencyRate == -1: avgCurrencyRate = None
+                model.updated_at = now
+                model.num_train_date = trainDay
+                model.num_test_date = testDay
+                model.episode_count = episodeCount 
+                model.currency_symobol = currencySymobol
+                model.start_balance=startBalance
+                model.currency_amount = currencyAmount
+                model.avg_currency_rate = avgCurrencyRate
+                model.gamma = gamma
+                model.epsilon = epsilon
+                model.epsilon_min = epsilon_min
+                model.epsilon_decay = epsilon_decay
+                model.start_date = startDate
+                model.end_date = endDate
+                model.have_model = False
+                model.start_date = newstartDate
+                model.end_date = newendDate
+
+                Policy.query.filter(Policy.model_id == model.id).delete()
+                for condition in conditions:
+                    new_condition = Policy(model_id= model.id,created_at = now, action = condition["action"], con = condition["con"], sym = condition["sym"], num = condition["num"])
+                    db.session.add(new_condition)
+                db.session.commit()
+
+                response = app.response_class(
+                response=json.dumps({
+                    'status_code': 200,
+                    'res': 'Save Succesful'
+                    }),
+                mimetype='application/json'
+                )
+                response.status_code = 200   
+
+            else :
+                md = Model.query.filter_by(user_id=userId,).\
+                filter_by(model_name = modelName).first()
+                if md:
+                    isParam = True
+                    notFoundParam = 'modelName already exist'
+                    isNotError = False   
+        else :
+            response = app.response_class(
+            response=json.dumps({
+                'status_code': 401,
+                'res': {"error":"Unauthorize model"}
+            }),
+            mimetype='application/json',
+            )
+            response.status_code = 401
+
+    if isParam:
+        response = app.response_class(
+            response=json.dumps({
+                'status_code': 422,
+                'res': {"symbol":notFoundParam}
+            }),
+            mimetype='application/json',
+        )
+        response.status_code = 422
+    return response
+    
