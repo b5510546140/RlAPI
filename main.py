@@ -139,6 +139,10 @@ def createModel():
             conditions = []
         else:
             conditions = req['conditions']  
+        if 'openclose' not in req:
+            openclose = "Close"
+        else:
+            openclose = req['openclose']
         md = Model.query.filter_by(user_id=userId,).\
         filter_by(model_name = modelName).first()
         if md:
@@ -157,7 +161,7 @@ def createModel():
                 newLog = Log(user_id = userId, created_at = now, log_text = "", train_text = "", test_text = "")
                 db.session.add(newLog)
                 db.session.commit()
-                fileName = Rl.trainModel(data, currencySymobol, episode_count= episodeCount, start_balance=startBalance, training=trainDay, test=testDay, model_name=modelName, log=newLog,currencyAmount = currencyAmount,avgCurrencyRate = avgCurrencyRate,gamma = gamma, epsilon= epsilon,epsilon_min=epsilon_min, epsilon_decay=epsilon_decay, conditions=conditions)
+                fileName = Rl.trainModel(data, currencySymobol, episode_count= episodeCount, start_balance=startBalance, training=trainDay, test=testDay, model_name=modelName, log=newLog,currencyAmount = currencyAmount,avgCurrencyRate = avgCurrencyRate,gamma = gamma, epsilon= epsilon,epsilon_min=epsilon_min, epsilon_decay=epsilon_decay, conditions=conditions, openclose=openclose)
                 response = app.response_class(
                     response=json.dumps({
                         'status_code': 201,
@@ -226,47 +230,6 @@ def getLog():
             mimetype='application/json',
         )
         response.status_code = 404
-    return response
-
-@main.route('/logTrain', methods=['POST'])
-@login_required
-def getLogTrain():
-    req = request.get_json()
-    isParam = False
-    app = current_app._get_current_object()
-    userId = current_user.get_id()
-    if 'modelId' not in req:
-        notFoundParam = 'modelId not found'
-        isParam = True
-    else:
-        model = Model.query.get(req['modelId'])
-        print(model.log_id)
-        log = Log.query.get(model.log_id)
-        print(log)
-        df = pd.DataFrame(columns = ["Episode","TotalPortforlio"])
-
-        if log is not None:
-            testList = log.train_text.split(',')
-            testList.pop()
-            for test in testList:
-                temp = test.split('_')
-
-                print(temp[0])
-                print(temp[1])
-                df = df.append({'Episode': temp[0],'TotalPortforlio' : temp[1]} , ignore_index=True)
-            print(df.head())
-            response = make_response(df.to_json(orient = "records"),200)
-            response.mimetype = 'application/json'
-        else:
-            response = app.response_class(
-                response=json.dumps({
-                    'status_code': 404,
-                    'res': {
-                        "error":'Not Found'}
-                }),
-                mimetype='application/json',
-            )
-            response.status_code = 404
     return response
 
 
@@ -432,6 +395,10 @@ def updateModel():
             conditions = []
         else:
             conditions = req['conditions']
+        if 'openclose' not in req:
+            openclose = "Close"
+        else:
+            openclose = req['openclose']
         isParam = False
         isUpdate = False
         isNotError = True
@@ -474,7 +441,7 @@ def updateModel():
                     newLog = Log(user_id = userId, created_at = now, log_text = "", train_text = "", test_text = "")
                     db.session.add(newLog)
                     db.session.commit()
-                    fileName = Rl.trainModel(data, currencySymobol, episode_count= episodeCount, start_balance=startBalance, training=trainDay, test=testDay, model_name=modelName, log=newLog, isUpdate = isUpdate, OldmodelPath= model.model_path,currencyAmount = currencyAmount,avgCurrencyRate = avgCurrencyRate,gamma = gamma, epsilon= epsilon,epsilon_min=epsilon_min, epsilon_decay=epsilon_decay, conditions=conditions)
+                    fileName = Rl.trainModel(data, currencySymobol, episode_count= episodeCount, start_balance=startBalance, training=trainDay, test=testDay, model_name=modelName, log=newLog, isUpdate = isUpdate, OldmodelPath= model.model_path,currencyAmount = currencyAmount,avgCurrencyRate = avgCurrencyRate,gamma = gamma, epsilon= epsilon,epsilon_min=epsilon_min, epsilon_decay=epsilon_decay, conditions=conditions, openclose= openclose)
                     response = app.response_class(
                         response=json.dumps({
                             'status_code': 201,
@@ -625,12 +592,24 @@ def testModel():
             startDate = req['startDate']
             endDate = req['endDate']
             startBalance = req['startBalance']
-            currencyAmount = req['currencyAmount']
-            avgCurrencyRate = req['avgCurrencyRate']
+            if 'currencyAmount' not in req or req['currencyAmount'] is None:
+                currencyAmount = -1
+            else:
+                currencyAmount = req['currencyAmount']
+            if 'avgCurrencyRate' not in req or req['avgCurrencyRate'] is None :
+                avgCurrencyRate = -1
+            else:
+                avgCurrencyRate = req['avgCurrencyRate']  
+            if 'openclose' not in req:
+                openclose = "Close"
+            else:
+                openclose = req['openclose']
             testDay = req['testDay']
             # testRl(data, currencySymobol, start_balance, training, test, filename, log, priceLook = 'Close'):
             data = yf.download(currencySymobol, start=startDate, end=endDate).reset_index()
-            result = Rl.testRl(data, currencySymobol, startBalance, training = 0, test = testDay, filename = model.model_path, log= None,currencyAmount = currencyAmount,avgCurrencyRate = avgCurrencyRate)
+            print(currencyAmount)
+            print(avgCurrencyRate)
+            result = Rl.testRl(data, currencySymobol, startBalance, training = 0, test = testDay, filename = model.model_path, log= None,currencyAmount = currencyAmount,avgCurrencyRate = avgCurrencyRate, priceLook = openclose)
             response = app.response_class(
             response=json.dumps({
                 'status_code': 200,
@@ -692,8 +671,14 @@ def predictModel():
             startDate = req['startDate']
             endDate = req['endDate']
             startBalance = req['startBalance']
-            currencyAmount = req['currencyAmount']
-            avgCurrencyRate = req['avgCurrencyRate']
+            if 'currencyAmount' not in req or req['currencyAmount'] is None:
+                currencyAmount = -1
+            else:
+                currencyAmount = req['currencyAmount']
+            if 'avgCurrencyRate' not in req or req['avgCurrencyRate'] is None :
+                avgCurrencyRate = -1
+            else:
+                avgCurrencyRate = req['avgCurrencyRate']  
             #   def getPredict(data, currencySymobol, start_balance, filename, currency_amount, avg_currency_rate, priceLook = 'Close'):
   
             data = yf.download(currencySymobol, start=startDate, end=endDate).reset_index()
@@ -874,3 +859,92 @@ def saveModel():
         response.status_code = 422
     return response
     
+@main.route('/logTrain', methods=['POST'])
+@login_required
+def getLogTrain():
+    req = request.get_json()
+    isParam = False
+    app = current_app._get_current_object()
+    userId = current_user.get_id()
+    if 'modelId' not in req:
+        notFoundParam = 'modelId not found'
+        isParam = True
+    else:
+        model = Model.query.get(req['modelId'])
+        print(model.log_id)
+        log = Log.query.get(model.log_id)
+        print(log)
+        df = pd.DataFrame(columns = ["Episode","TotalPortforlio"])
+
+        if log is not None:
+            testList = log.train_text.split(',')
+            testList.pop()
+            for test in testList:
+                temp = test.split('_')
+
+                print(temp[0])
+                print(temp[1])
+                df = df.append({'Episode': temp[0],'TotalPortforlio' : temp[1]} , ignore_index=True)
+            print(df.head())
+            response = make_response(df.to_json(orient = "records"),200)
+            response.mimetype = 'application/json'
+        else:
+            response = app.response_class(
+                response=json.dumps({
+                    'status_code': 404,
+                    'res': {
+                        "error":'Not Found'}
+                }),
+                mimetype='application/json',
+            )
+            response.status_code = 404
+    return response
+
+
+@main.route('/logById', methods=['POST'])
+@login_required
+def getLogById():
+    req = request.get_json()
+    isParam = False
+    app = current_app._get_current_object()
+    userId = current_user.get_id()
+    if 'modelId' not in req:
+        notFoundParam = 'modelId not found'
+        isParam = True
+    else:
+        model = Model.query.get(req['modelId'])
+        if model:
+            log = Log.query.get(model.log_id)
+            if log is not None:
+                if str(userId) == str(log.user_id):
+                    response = app.response_class(
+                        response=json.dumps({
+                            'status_code': 200,
+                            'res': {
+                                "userId":log.user_id,
+                                "data":log.log_text,
+                                "train":log.train_text}
+                        }),
+                        mimetype='application/json',
+                    )
+                    response.status_code = 200
+                    return response
+                else:
+                    response = app.response_class(
+                    response=json.dumps({
+                        'status_code': 401,
+                        'res': {"error":"Unauthorize model"}
+                    }),
+                    mimetype='application/json',
+                    )
+                    response.status_code = 401
+        response = app.response_class(
+            response=json.dumps({
+                'status_code': 404,
+                'res': {
+                    "error":'Not Found'}
+            }),
+            mimetype='application/json',
+        )
+        response.status_code = 404
+    return response

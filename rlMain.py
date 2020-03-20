@@ -25,7 +25,7 @@ import operator
 
 class Rl():
 
-    def trainModel(data, currencySymobol, episode_count, start_balance, training, test, model_name, log, isUpdate = False, OldmodelPath = "",currencyAmount = -1, avgCurrencyRate = -1,gamma = 0.95, epsilon = 1.0, epsilon_min = 0.01, epsilon_decay = 0.995, conditions = []):
+    def trainModel(data, currencySymobol, episode_count, start_balance, training, test, model_name, log, isUpdate = False, OldmodelPath = "",currencyAmount = -1, avgCurrencyRate = -1,gamma = 0.95, epsilon = 1.0, epsilon_min = 0.01, epsilon_decay = 0.995, conditions = [], openclose = 'Close'):
 
         pd_data1_train=data[0:training]
         pd_data1_test=data[training:training+test]
@@ -84,25 +84,26 @@ class Rl():
             print(gamma)
             agent = Agent(5, gamma = gamma, epsilon= epsilon, epsilon_min=epsilon_min, epsilon_decay=epsilon_decay)
             agent.inventory1 =[]
-            open_cash_t1=open_cash
+            
             if currencyAmount == 0: currencyAmount = -1
             if avgCurrencyRate == 0: avgCurrencyRate = -1
             if currencyAmount != -1 and avgCurrencyRate != -1:
                 for i in range(currencyAmount):
                     agent.inventory1.append(avgCurrencyRate)
                     totalInven = totalInven + avgCurrencyRate
-                Bal_stock1 = start_balance
+                open_cash = start_balance
             else:
                 Bal_stock1 = int(np.floor((start_balance/2)/data1_train[0]))
                 for i in range(Bal_stock1):
                     agent.inventory1.append(data1_train[0])
                     totalInven = totalInven + data1_train[0]
+                open_cash = start_balance - (data1_test[0] * len(agent.inventory1))
             Bal_stock1_t1 = len(agent.inventory1)
-            print(Bal_stock1_t1)
+            Bal_stock1 = Bal_stock1_t1
             avgInven = totalInven/Bal_stock1_t1
             #Timestep delta to make sure that with time reward increases for taking action
             #timestep_delta=0
-            
+            open_cash_t1=open_cash
             #Running episode over all days in the datasize
             for t in range(datasize):
         #         print(datasize)
@@ -351,6 +352,7 @@ class Rl():
                     print("Total portfolio value: " + str(next_state_class_obj.portfolio_value)+ "  stock 1 number: " + str(len(agent.inventory1)))
                     # print(agent.inventory1)
                     #      +"  stock 2 number: "+str(len(agent.inventory2))+"  open cash"+str(next_state_class_obj.open_cash))
+                    log.log_text = log.log_text + " Total port value: " +str(next_state_class_obj.portfolio_value)+"\n"
                     log.train_text = log.train_text +str(e+1)+"_" +str(next_state_class_obj.portfolio_value)+","
                     total_Prof.append(total_profit)
                     total_stock1bal.append(len(agent.inventory1))
@@ -393,6 +395,8 @@ class Rl():
         total_open_cash=[]
         total_port_value=[]
         total_days_played=[]
+        if currencyAmount == 0: currencyAmount = -1
+        if avgCurrencyRate == 0: avgCurrencyRate = -1
 
         for e in range(1):
         #     Bal_stock1 = 0
@@ -402,18 +406,26 @@ class Rl():
             done=False
             total_profit = 0
             reward = 0
-            
+            totalInven = 0
+            buySize = 50
+            maxSize = 100
             agent = Agent(5, is_eval=True, model_name=filename)
             agent.inventory1 =[]
-            open_cash_t1=open_cash
-            if currencyAmount != -1 & avgCurrencyRate != -1:
+            
+            if currencyAmount != -1 and avgCurrencyRate != -1:
                 for i in range(currencyAmount):
                     agent.inventory1.append(avgCurrencyRate)
+                    totalInven = totalInven + avgCurrencyRate
+                open_cash = start_balance
             else:
+                Bal_stock1 = int(np.floor((start_balance/2)/data1_test[0]))
                 for i in range(Bal_stock1):
                     agent.inventory1.append(data1_test[0])
-                    
+                    totalInven = totalInven + data1_test[0]
+                open_cash = start_balance - (data1_test[0] * len(agent.inventory1))
             Bal_stock1_t1 = len(agent.inventory1)
+            Bal_stock1 = Bal_stock1_t1
+            open_cash_t1=open_cash
             #Running episode over all days in the datasize
             for t in range(datasize):
                 state_class_obj= State(data1_test, Bal_stock1, open_cash,t)
@@ -425,9 +437,8 @@ class Rl():
         #         print(agent.getPredict(state_array_obj))       
                 change_percent_stock1=(state_class_obj.Stock1Price-state_class_obj.fiveday_stock1)/state_class_obj.fiveday_stock1*100
                 
-                
                 if action == 0:  #buy stock 1
-                    print(action)
+
                     if state_class_obj.Stock1Price > state_class_obj.open_cash:
                         '''
                         print("Buy stock 1 when it did not have cash, so bankrupt, end of episode")
@@ -438,11 +449,17 @@ class Rl():
                         #end episode
                             
                     else:
-                        #print("In Buy stock 1")
-                        agent.inventory1.append(data1_test[t])
+                        buytemp = state_class_obj.open_cash/buySize
+                        buyamount = np.floor(buytemp/data1_test[t])
+                        if buyamount == 0: buyamount = 1
+                        for i in range(int(buyamount)):
+                            agent.inventory1.append(data1_test[t])
+                            totalInven = totalInven + data1_test[t]
+                        # print(len(agent.inventory1))
                         Bal_stock1_t1= len(agent.inventory1)
-        #                 Bal_stock2_t1=len(agent.inventory2)
-                        open_cash_t1=state_class_obj.open_cash-state_class_obj.Stock1Price #Here we are buying 1 stock
+                        avgInven = totalInven/Bal_stock1_t1
+                        open_cash_t1=state_class_obj.open_cash-state_class_obj.Stock1Price * buyamount #Here we are buying 1 stock
+                        buySize = buySize - 1
                         
 
                     
@@ -453,17 +470,22 @@ class Rl():
                     if state_class_obj.Stock1Blnc <1 :
                         done = True
                     else:
-                        #print("In sell stock 1")
-                        bought_price1=agent.inventory1.pop(0)
+                        sellSize = maxSize - buySize
+                        buySize = buySize + 1
+                        tempSale = np.floor(Bal_stock1_t1 / sellSize)
+                        if tempSale == 0: tempSale = 1
+                        TotalBought = 0
+                        for j in range(int(tempSale)):
+                            bought_price1 = agent.inventory1.pop(0)
+                            TotalBought = TotalBought + bought_price1
+                            totalInven = totalInven - avgInven
                         Bal_stock1_t1= len(agent.inventory1)
-                        open_cash_t1=state_class_obj.open_cash+state_class_obj.Stock1Price #State[0] is the price of stock 1. Here we are buying 1 stoc
-                        #total_profit += data1_test[t] - bought_price1
-                    #print("reward for sell stock1 " + str(reward))
-                        
+                        avgInven = totalInven/Bal_stock1_t1
+                        open_cash_t1 = state_class_obj.open_cash + (state_class_obj.Stock1Price * tempSale) #State[0] is the price of stock 1. Here we are buying 1 stoc
+                  
                 
                 if action == 2:             # Do nothing action
-                    if (abs(change_percent_stock1)<=2):
-                        reward=abs(change_percent_stock1)*100
+                    print("Hold")
 
                     Bal_stock1_t1= len(agent.inventory1)
                     
@@ -483,7 +505,7 @@ class Rl():
                 open_cash=open_cash_t1
                 
                 
-                
+                print(open_cash)
                 if done==True:
                     #print("--------------------------------")
                 # print("Total Profit: " + formatPrice(total_profit))
