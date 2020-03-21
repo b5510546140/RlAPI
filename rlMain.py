@@ -97,7 +97,7 @@ class Rl():
                 for i in range(Bal_stock1):
                     agent.inventory1.append(data1_train[0])
                     totalInven = totalInven + data1_train[0]
-                open_cash = start_balance - (data1_test[0] * len(agent.inventory1))
+                open_cash = start_balance - (data1_train[0] * len(agent.inventory1))
             Bal_stock1_t1 = len(agent.inventory1)
             Bal_stock1 = Bal_stock1_t1
             avgInven = totalInven/Bal_stock1_t1

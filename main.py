@@ -442,14 +442,6 @@ def updateModel():
                     db.session.add(newLog)
                     db.session.commit()
                     fileName = Rl.trainModel(data, currencySymobol, episode_count= episodeCount, start_balance=startBalance, training=trainDay, test=testDay, model_name=modelName, log=newLog, isUpdate = isUpdate, OldmodelPath= model.model_path,currencyAmount = currencyAmount,avgCurrencyRate = avgCurrencyRate,gamma = gamma, epsilon= epsilon,epsilon_min=epsilon_min, epsilon_decay=epsilon_decay, conditions=conditions, openclose= openclose)
-                    response = app.response_class(
-                        response=json.dumps({
-                            'status_code': 201,
-                            'res': {"symbol":currencySymobol}
-                        }),
-                        mimetype='application/json',
-                    )
-                    response.status_code = 201
                     newstartDate = datetime.datetime.strptime(startDate, '%Y-%m-%d').date()
                     newendDate = datetime.datetime.strptime(endDate, '%Y-%m-%d').date()
                     if currencyAmount == -1: currencyAmount = None
@@ -480,6 +472,14 @@ def updateModel():
                             new_condition = Policy(model_id= model.id,created_at = now, action = condition["action"], con = condition["con"], sym = condition["sym"], num = condition["num"])
                             db.session.add(new_condition)
                         db.session.commit()
+                        response = app.response_class(
+                            response=json.dumps({
+                                'status_code': 201,
+                                'res': {"model_id":model.id}
+                            }),
+                            mimetype='application/json',
+                        )
+                        response.status_code = 201                        
                     else:
                         new_Rlmodel = Model(user_id = userId, created_at = now, num_train_date = trainDay, num_test_date = testDay,episode_count = episodeCount ,model_name = modelName, currency_symobol = currencySymobol, log_id = newLog.id, model_path = fileName,  start_balance=startBalance, currency_amount = currencyAmount,avg_currency_rate = avgCurrencyRate,gamma = gamma, epsilon= epsilon, epsilon_min=epsilon_min, epsilon_decay=epsilon_decay,start_date= newstartDate,end_date = newendDate, have_model = True)
                         db.session.add(new_Rlmodel)
@@ -490,6 +490,14 @@ def updateModel():
                             new_condition = Policy(model_id= md.id,created_at = now, action = condition["action"], con = condition["con"], sym = condition["sym"], num = condition["num"])
                             db.session.add(new_condition)
                         db.session.commit()
+                        response = app.response_class(
+                            response=json.dumps({
+                                'status_code': 201,
+                                'res': {"model_id":md.id}
+                            }),
+                            mimetype='application/json',
+                        )
+                        response.status_code = 201              
         else :
             response = app.response_class(
             response=json.dumps({
