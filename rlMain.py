@@ -425,6 +425,7 @@ class Rl():
                 open_cash = start_balance - (data1_test[0] * len(agent.inventory1))
             Bal_stock1_t1 = len(agent.inventory1)
             Bal_stock1 = Bal_stock1_t1
+            avgInven = totalInven/Bal_stock1_t1
             open_cash_t1=open_cash
             #Running episode over all days in the datasize
             for t in range(datasize):

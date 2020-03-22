@@ -162,14 +162,6 @@ def createModel():
                 db.session.add(newLog)
                 db.session.commit()
                 fileName = Rl.trainModel(data, currencySymobol, episode_count= episodeCount, start_balance=startBalance, training=trainDay, test=testDay, model_name=modelName, log=newLog,currencyAmount = currencyAmount,avgCurrencyRate = avgCurrencyRate,gamma = gamma, epsilon= epsilon,epsilon_min=epsilon_min, epsilon_decay=epsilon_decay, conditions=conditions, openclose=openclose)
-                response = app.response_class(
-                    response=json.dumps({
-                        'status_code': 201,
-                        'res': {"symbol":currencySymobol}
-                    }),
-                    mimetype='application/json',
-                )
-                response.status_code = 201
                 isParam = False
                 newstartDate = datetime.datetime.strptime(startDate, '%Y-%m-%d').date()
                 newendDate = datetime.datetime.strptime(endDate, '%Y-%m-%d').date()
@@ -180,6 +172,14 @@ def createModel():
                 db.session.commit()
                 md = Model.query.filter_by(user_id=userId,).\
                 filter_by(model_name = modelName).first()
+                response = app.response_class(
+                    response=json.dumps({
+                        'status_code': 201,
+                        'res': {"model_id":md.id}
+                    }),
+                    mimetype='application/json',
+                )
+                response.status_code = 201
                 for condition in conditions:
                     new_condition = Policy(model_id= md.id,created_at = now, action = condition["action"], con = condition["con"], sym = condition["sym"], num = condition["num"])
                     db.session.add(new_condition)

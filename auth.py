@@ -37,14 +37,13 @@ def login_post():
             'res': 'Login suceesful',
             'isUser': True
         }
-        print(user.password)
-        print(password)
+
         # check if user actually exists
         # take the user supplied password, hash it, and compare it to the hashed password in database
         if not user or not check_password_hash(user.password, password): 
             # flash('Please check your login details and try again.')
             data = {
-                'res': 'Please check your login details and try again.',
+                'res': 'Please check your Username or Password.',
                 'isUser': False
             }
         else:
