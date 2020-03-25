@@ -32,7 +32,7 @@ def create_app():
 
     @login_manager.unauthorized_handler
     def unauthorized_callback():
-        print("Need Login")
+
         app = current_app._get_current_object()
         response = app.response_class(
         response=json.dumps({

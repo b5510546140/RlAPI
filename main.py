@@ -96,6 +96,8 @@ def createModel():
         notFoundParam = 'modelName not found'
     elif 'startBalance'not in req:
         notFoundParam = 'startBalance not found'
+    elif req['startBalance'] <= 0:
+        notFoundParam = 'startBalance cannot less than or equal 0'
     elif 'episodeCount'not in req:
         notFoundParam = 'episodeCount not found'
     elif 'trainingDay'not in req:
@@ -180,6 +182,7 @@ def createModel():
                     mimetype='application/json',
                 )
                 response.status_code = 201
+                
                 for condition in conditions:
                     new_condition = Policy(model_id= md.id,created_at = now, action = condition["action"], con = condition["con"], sym = condition["sym"], num = condition["num"])
                     db.session.add(new_condition)
@@ -582,10 +585,6 @@ def testModel():
         notFoundParam = 'endDate not found'
     elif 'symbol'not in req:
         notFoundParam = 'symbol not found'
-    elif 'currencyAmount'not in req:
-        notFoundParam = 'currencyAmount not found'
-    elif 'avgCurrencyRate'not in req:
-        notFoundParam = 'avgCurrencyRate not found'
     elif 'startBalance'not in req:
         notFoundParam = 'startBalance not found'
     elif 'testDay'not in req:
@@ -689,16 +688,29 @@ def predictModel():
                 avgCurrencyRate = req['avgCurrencyRate']  
             #   def getPredict(data, currencySymobol, start_balance, filename, currency_amount, avg_currency_rate, priceLook = 'Close'):
   
-            data = yf.download(currencySymobol, start=startDate, end=endDate).reset_index()
-            result = Rl.getPredict(data, currencySymobol, startBalance, filename = model.model_path,currency_amount = currencyAmount,avg_currency_rate = avgCurrencyRate)
-            response = app.response_class(
-            response=json.dumps({
-                'status_code': 200,
-                'res': result
-                }),
-            mimetype='application/json'
-            )
-            response.status_code = 200     
+            try:
+                data = yf.download(currencySymobol, start=startDate, end=endDate).reset_index()
+            except:
+                data = []
+            if len(data) > 0:
+                result = Rl.getPredict(data, currencySymobol, startBalance, filename = model.model_path,currency_amount = currencyAmount,avg_currency_rate = avgCurrencyRate)
+                response = app.response_class(
+                response=json.dumps({
+                    'status_code': 200,
+                    'res': result
+                    }),
+                mimetype='application/json'
+                )
+                response.status_code = 200
+            else:
+                response = app.response_class(
+                    response=json.dumps({
+                        'status_code': 422,
+                        'res': {"symbol":"No data found, Please don't selected weekend"}
+                    }),
+                    mimetype='application/json',
+                )
+                response.status_code = 422
         else:
             response = app.response_class(
             response=json.dumps({
@@ -801,11 +813,12 @@ def saveModel():
             response.status_code = 404
             return response
         if str(model.user_id) == str(userId):
+            newstartDate = datetime.datetime.strptime(startDate, '%Y-%m-%d').date()
+            newendDate = datetime.datetime.strptime(endDate, '%Y-%m-%d').date()
+            if currencyAmount == -1: currencyAmount = None
+            if avgCurrencyRate == -1: avgCurrencyRate = None
+
             if str(model.model_name) == modelName:
-                newstartDate = datetime.datetime.strptime(startDate, '%Y-%m-%d').date()
-                newendDate = datetime.datetime.strptime(endDate, '%Y-%m-%d').date()
-                if currencyAmount == -1: currencyAmount = None
-                if avgCurrencyRate == -1: avgCurrencyRate = None
                 model.updated_at = now
                 model.num_train_date = trainDay
                 model.num_test_date = testDay
@@ -845,7 +858,26 @@ def saveModel():
                 if md:
                     isParam = True
                     notFoundParam = 'modelName already exist'
-                    isNotError = False   
+                    isNotError = False
+                else:
+                    # Save as new model
+                    new_Rlmodel = Model(user_id = userId, created_at = now, num_train_date = trainDay, num_test_date = testDay,episode_count = episodeCount ,model_name = modelName, currency_symobol = currencySymobol, have_model = False,  start_balance=startBalance, currency_amount = currencyAmount,avg_currency_rate = avgCurrencyRate,gamma = gamma, epsilon= epsilon, epsilon_min=epsilon_min, epsilon_decay=epsilon_decay,start_date= newstartDate,end_date = newendDate, model_path = '')
+                    db.session.add(new_Rlmodel)
+                    db.session.commit()
+                    md = Model.query.filter_by(user_id=userId,).\
+                    filter_by(model_name = modelName).first()
+                    for condition in conditions:
+                        new_condition = Policy(model_id= md.id,created_at = now, action = condition["action"], con = condition["con"], sym = condition["sym"], num = condition["num"])
+                        db.session.add(new_condition)
+                    db.session.commit()
+                    response = app.response_class(
+                        response=json.dumps({
+                            'status_code': 201,
+                            'res': {"model_id":md.id}
+                        }),
+                        mimetype='application/json',
+                    )
+                    response.status_code = 201        
         else :
             response = app.response_class(
             response=json.dumps({

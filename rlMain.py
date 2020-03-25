@@ -100,7 +100,8 @@ class Rl():
                 open_cash = start_balance - (data1_train[0] * len(agent.inventory1))
             Bal_stock1_t1 = len(agent.inventory1)
             Bal_stock1 = Bal_stock1_t1
-            avgInven = totalInven/Bal_stock1_t1
+            if Bal_stock1_t1 == 0: avgInven = 0
+            else:avgInven = totalInven/Bal_stock1_t1
             #Timestep delta to make sure that with time reward increases for taking action
             #timestep_delta=0
             open_cash_t1=open_cash
@@ -262,7 +263,8 @@ class Rl():
 
                             if isSellDeafault:
                                 reward=change_percent_stock1*100 #State[0] is the price of stock 1. Here we are buying 1 stock
-                    total_profit += (tempSale * data1_train[t]) - TotalBought
+                    if not done:
+                        total_profit += (tempSale * data1_train[t]) - TotalBought
                     #print("reward for sell stock1 " + str(reward))
                         
                 if action == 2:             # Do nothing action    
@@ -397,7 +399,7 @@ class Rl():
         total_days_played=[]
         if currencyAmount == 0: currencyAmount = -1
         if avgCurrencyRate == 0: avgCurrencyRate = -1
-
+        resultText = ""
         for e in range(1):
         #     Bal_stock1 = 0
             Bal_stock1 = int(np.floor((start_balance/2)/data1_test[0]))
@@ -425,7 +427,8 @@ class Rl():
                 open_cash = start_balance - (data1_test[0] * len(agent.inventory1))
             Bal_stock1_t1 = len(agent.inventory1)
             Bal_stock1 = Bal_stock1_t1
-            avgInven = totalInven/Bal_stock1_t1
+            if Bal_stock1_t1 == 0: avgInven = 0
+            else:avgInven = totalInven/Bal_stock1_t1
             open_cash_t1=open_cash
             #Running episode over all days in the datasize
             for t in range(datasize):
@@ -441,6 +444,7 @@ class Rl():
                 if action == 0:  #buy stock 1
 
                     if state_class_obj.Stock1Price > state_class_obj.open_cash:
+                        resultText = resultText + "Test Day "+ str(t+1) + " Buy but did not have cash, so bankrupt, end of episode"
                         '''
                         print("Buy stock 1 when it did not have cash, so bankrupt, end of episode")
                         reward=-reward_timedelta*10
@@ -461,15 +465,15 @@ class Rl():
                         avgInven = totalInven/Bal_stock1_t1
                         open_cash_t1=state_class_obj.open_cash-state_class_obj.Stock1Price * buyamount #Here we are buying 1 stock
                         buySize = buySize - 1
+                        resultText = resultText + "Test Day "+ str(t+1) + " Buy "
                         
 
                     
                         
                 if action == 1:  #sell stock 1
-                    print(action)
-                    print(state_class_obj.Stock1Blnc)
                     if state_class_obj.Stock1Blnc <1 :
                         done = True
+                        resultText = resultText + "Test Day "+ str(t+1) + " Sell but don't have cyrrency left "
                     else:
                         sellSize = maxSize - buySize
                         buySize = buySize + 1
@@ -483,12 +487,13 @@ class Rl():
                         Bal_stock1_t1= len(agent.inventory1)
                         avgInven = totalInven/Bal_stock1_t1
                         open_cash_t1 = state_class_obj.open_cash + (state_class_obj.Stock1Price * tempSale) #State[0] is the price of stock 1. Here we are buying 1 stoc
-                  
+                        resultText = resultText + "Test Day "+ str(t+1) + " Sell "
                 
                 if action == 2:             # Do nothing action
                     print("Hold")
 
                     Bal_stock1_t1= len(agent.inventory1)
+                    resultText = resultText + "Test Day "+ str(t+1) + " Hold "
                     
 
                 if t == datasize-1:
@@ -504,9 +509,9 @@ class Rl():
                 
                 Bal_stock1=Bal_stock1_t1
                 open_cash=open_cash_t1
+
+                resultText = resultText + "|Balance: "+str(Bal_stock1)+" open_cash: "+str(open_cash)+"  \n"
                 
-                
-                print(open_cash)
                 if done==True:
                     #print("--------------------------------")
                 # print("Total Profit: " + formatPrice(total_profit))
@@ -514,16 +519,16 @@ class Rl():
                 # print("Total portfolio value: " + str(next_state_class_obj.portfolio_value)+ 
                     #     "  stock 1 number: " + str(len(agent.inventory1))
                     #      +"  stock 2 number: "+str(len(agent.inventory2))+"  open cash"+str(next_state_class_obj.open_cash))
-                    resultText = "Total "+ str(currencySymobol)+" in Balance "+ str(Bal_stock1) + "\n Total Open cash in episodes"+ str(open_cash)+ " \n Total Portfolio value in episodes"+ str(state_class_obj.portfolio_value) +" \n Total Days in episodes"+ str(t+1)
+                    resultText = resultText + "Total "+ str(currencySymobol)+" in Balance "+ str(Bal_stock1) + "\n Total Open cash in episodes"+ str(open_cash)+ " \n Total Portfolio value in episodes"+ str(state_class_obj.portfolio_value) +" \n Total Days in episodes"+ str(t+1)
                     if log is not None:
                         log.log_text = log.log_text + resultText
                         db.session.commit()
                     print("Total "+ str(currencySymobol)+" in Balance "+ str(Bal_stock1))
                     # print("Total Amazon stocks in episodes"+ str(total_stock2bal))
-                    print("Total Open cash in episodes"+ str(open_cash))
-                    print("Total Portfolio value in episodes"+ str(state_class_obj.portfolio_value))
+                    print("Total Open cash in episodes "+ str(open_cash))
+                    print("Total Portfolio value in episodes "+ str(state_class_obj.portfolio_value))
                     print("------------------------------")
-                    print("Total Days in episodes"+ str(t+1))
+                    print("Total Days in episodes "+ str(t+1))
 
                     print("--------------------------------")
                     clear_session()
@@ -566,8 +571,8 @@ class Rl():
         #         print(state_array_obj)
                 action = agent.act(state_array_obj)
         #         print("Agent .get predict = ")
-        #         print(agent.getPredict(state_array_obj))
-                print(action)           
+                print(agent.getPredict(state_array_obj))
+                # print(action)           
         actionName = ""
         if action == 0:  #buy stock 1
             actionName = "Buy"
