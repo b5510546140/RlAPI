@@ -383,7 +383,6 @@ class Rl():
                 print("Save Done")
                 clear_session()
                 # agent.clearSeassion()
-        print(filename)
         Rl.testRl(data, currencySymobol, start_balance, training, test, filename, log, currencyAmount = currencyAmount, avgCurrencyRate = avgCurrencyRate)
         return filename
 

@@ -38,6 +38,8 @@ class Model(db.Model,Base):
     policy = db.relationship('Policy', backref='model', lazy=True)
     model_path = db.Column(db.String(100), nullable=False)
     have_model = db.Column(db.Boolean)
+    buy_lot_size = db.Column(db.Float)
+    sale_lot_size = db.Column(db.Float)
 
 class Log(db.Model,Base):
     id = db.Column(db.Integer, primary_key=True)
