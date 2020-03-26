@@ -354,7 +354,7 @@ class Rl():
                     print("Total portfolio value: " + str(next_state_class_obj.portfolio_value)+ "  stock 1 number: " + str(len(agent.inventory1)))
                     # print(agent.inventory1)
                     #      +"  stock 2 number: "+str(len(agent.inventory2))+"  open cash"+str(next_state_class_obj.open_cash))
-                    log.log_text = log.log_text + " Total port value: " +str(next_state_class_obj.portfolio_value)+"\n"
+                    log.log_text = log.log_text + " Total port value: " +"{0:,.2f}".format(next_state_class_obj.portfolio_value)+"\n"
                     log.train_text = log.train_text +str(e+1)+"_" +str(next_state_class_obj.portfolio_value)+","
                     total_Prof.append(total_profit)
                     total_stock1bal.append(len(agent.inventory1))
@@ -410,6 +410,9 @@ class Rl():
             totalInven = 0
             buySize = 50
             maxSize = 100
+            temp = avgCurrencyRate * currencyAmount
+            if temp == 1: startPort = start_balance
+            else:  startPort = start_balance + avgCurrencyRate * currencyAmount
             agent = Agent(5, is_eval=True, model_name=filename)
             agent.inventory1 =[]
             
@@ -509,7 +512,7 @@ class Rl():
                 Bal_stock1=Bal_stock1_t1
                 open_cash=open_cash_t1
 
-                resultText = resultText + "|Balance: "+str(Bal_stock1)+" open_cash: "+str(open_cash)+"  \n"
+                resultText = resultText + "|Balance: "+str(Bal_stock1)+" open_cash: "+"{0:,.2f}".format(open_cash)+"  \n"
                 
                 if done==True:
                     #print("--------------------------------")
@@ -518,7 +521,7 @@ class Rl():
                 # print("Total portfolio value: " + str(next_state_class_obj.portfolio_value)+ 
                     #     "  stock 1 number: " + str(len(agent.inventory1))
                     #      +"  stock 2 number: "+str(len(agent.inventory2))+"  open cash"+str(next_state_class_obj.open_cash))
-                    resultText = resultText + "Total "+ str(currencySymobol)+" in Balance "+ str(Bal_stock1) + "\n Total Open cash in episodes"+ str(open_cash)+ " \n Total Portfolio value in episodes"+ str(state_class_obj.portfolio_value) +" \n Total Days in episodes"+ str(t+1)
+                    resultText = resultText + "Total "+ str(currencySymobol)+" in Balance "+ str(Bal_stock1) + "\n Total Open cash in episodes "+ "{0:,.2f}".format(open_cash)+ " \n Total Portfolio value in episodes "+ "{0:,.2f}".format(state_class_obj.portfolio_value) +" \n Total Days in episodes "+ str(t+1) + "\n"+ "Total Profit: " + "{0:,.2f}".format(startPort - state_class_obj.portfolio_value) + "\n"+ "Total Profit %: " + "{0:,.2f}".format((startPort - state_class_obj.portfolio_value)/startPort*100) + " %"
                     if log is not None:
                         log.log_text = log.log_text + resultText
                         db.session.commit()
