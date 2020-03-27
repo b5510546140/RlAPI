@@ -145,6 +145,14 @@ def createModel():
             openclose = "Close"
         else:
             openclose = req['openclose']
+        if 'buyLotSize' not in req:
+            buyLotSize = -1
+        else:
+            buyLotSize = req['buyLotSize']
+        if 'saleLotSize' not in req:
+            saleLotSize = -1
+        else:
+            saleLotSize = req['saleLotSize']
         md = Model.query.filter_by(user_id=userId,).\
         filter_by(model_name = modelName).first()
         if md:
@@ -163,13 +171,13 @@ def createModel():
                 newLog = Log(user_id = userId, created_at = now, log_text = "", train_text = "", test_text = "")
                 db.session.add(newLog)
                 db.session.commit()
-                fileName = Rl.trainModel(data, currencySymobol, episode_count= episodeCount, start_balance=startBalance, training=trainDay, test=testDay, model_name=modelName, log=newLog,currencyAmount = currencyAmount,avgCurrencyRate = avgCurrencyRate,gamma = gamma, epsilon= epsilon,epsilon_min=epsilon_min, epsilon_decay=epsilon_decay, conditions=conditions, openclose=openclose)
+                fileName = Rl.trainModel(data, currencySymobol, episode_count= episodeCount, start_balance=startBalance, training=trainDay, test=testDay, model_name=modelName, log=newLog,currencyAmount = currencyAmount,avgCurrencyRate = avgCurrencyRate,gamma = gamma, epsilon= epsilon,epsilon_min=epsilon_min, epsilon_decay=epsilon_decay, conditions=conditions, openclose=openclose, buyLotSize = buyLotSize, saleLotSize = saleLotSize)
                 isParam = False
                 newstartDate = datetime.datetime.strptime(startDate, '%Y-%m-%d').date()
                 newendDate = datetime.datetime.strptime(endDate, '%Y-%m-%d').date()
                 if currencyAmount == -1: currencyAmount = None
                 if avgCurrencyRate == -1: avgCurrencyRate = None
-                new_Rlmodel = Model(user_id = userId, created_at = now, num_train_date = trainDay, num_test_date = testDay,episode_count = episodeCount ,model_name = modelName, currency_symobol = currencySymobol, log_id = newLog.id, model_path = fileName,  start_balance=startBalance, currency_amount = currencyAmount,avg_currency_rate = avgCurrencyRate, gamma = gamma, epsilon= epsilon, epsilon_min=epsilon_min, epsilon_decay=epsilon_decay, start_date= newstartDate,end_date = newendDate, have_model = True)
+                new_Rlmodel = Model(user_id = userId, created_at = now, num_train_date = trainDay, num_test_date = testDay,episode_count = episodeCount ,model_name = modelName, currency_symobol = currencySymobol, log_id = newLog.id, model_path = fileName,  start_balance=startBalance, currency_amount = currencyAmount,avg_currency_rate = avgCurrencyRate, gamma = gamma, epsilon= epsilon, epsilon_min=epsilon_min, epsilon_decay=epsilon_decay, start_date= newstartDate,end_date = newendDate, have_model = True, buy_lot_size = buyLotSize, sale_lot_size = saleLotSize)
                 db.session.add(new_Rlmodel)
                 db.session.commit()
                 md = Model.query.filter_by(user_id=userId,).\

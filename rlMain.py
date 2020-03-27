@@ -25,7 +25,7 @@ import operator
 
 class Rl():
 
-    def trainModel(data, currencySymobol, episode_count, start_balance, training, test, model_name, log, isUpdate = False, OldmodelPath = "",currencyAmount = -1, avgCurrencyRate = -1,gamma = 0.95, epsilon = 1.0, epsilon_min = 0.01, epsilon_decay = 0.995, conditions = [], openclose = 'Close'):
+    def trainModel(data, currencySymobol, episode_count, start_balance, training, test, model_name, log, isUpdate = False, OldmodelPath = "",currencyAmount = -1, avgCurrencyRate = -1,gamma = 0.95, epsilon = 1.0, epsilon_min = 0.01, epsilon_decay = 0.995, conditions = [], openclose = 'Close', buyLotSize = -1, saleLotSize = -1):
 
         pd_data1_train=data[0:training]
         pd_data1_test=data[training:training+test]
@@ -49,11 +49,11 @@ class Rl():
         buyPolicy = []
         sellPolicy = []
         holdPolicy = []
+
         if len(conditions) > 0: 
             isPolicy = True 
             ops = { ">": operator.gt, "<": operator.lt, "=": operator.eq, ">=": operator.ge, "<=": operator.le }
             for condition in conditions:
-                print(condition["action"])
                 if condition["action"] == "buy":
                     buyPolicy.append(condition)
                 elif condition["action"] == "sell":
@@ -81,7 +81,7 @@ class Rl():
             totalInven = 0
             avgInven = -1
             #Initialize Agent
-            print(gamma)
+
             agent = Agent(5, gamma = gamma, epsilon= epsilon, epsilon_min=epsilon_min, epsilon_decay=epsilon_decay)
             agent.inventory1 =[]
             
@@ -139,17 +139,25 @@ class Rl():
                              
                     else:
                         #print("In Buy stock 1")
-                        buytemp = state_class_obj.open_cash/buySize
-                        buyamount = np.floor(buytemp/data1_train[t])
-                        if buyamount == 0: buyamount = 1
-                        for i in range(int(buyamount)):
-                            agent.inventory1.append(data1_train[t])
-                            totalInven = totalInven + data1_train[t]
-                        # print(len(agent.inventory1))
-                        Bal_stock1_t1= len(agent.inventory1)
-                        avgInven = totalInven/Bal_stock1_t1
-                        open_cash_t1=state_class_obj.open_cash-state_class_obj.Stock1Price * buyamount #Here we are buying 1 stock
-                        buySize = buySize - 1
+                        if buyLotSize == -1:
+                            buytemp = state_class_obj.open_cash/buySize
+                            buyamount = np.floor(buytemp/data1_train[t])
+                            if buyamount == 0: buyamount = 1
+                            for i in range(int(buyamount)):
+                                agent.inventory1.append(data1_train[t])
+                                totalInven = totalInven + data1_train[t]
+                            # print(len(agent.inventory1))
+                            Bal_stock1_t1= len(agent.inventory1)
+                            avgInven = totalInven/Bal_stock1_t1
+                            open_cash_t1=state_class_obj.open_cash - state_class_obj.Stock1Price * buyamount #Here we are buying 1 stock
+                            buySize = buySize - 1
+                        else:
+                            for i in range(int(buyLotSize)):
+                                agent.inventory1.append(data1_train[t])
+                                totalInven = totalInven + data1_train[t]
+                            Bal_stock1_t1= len(agent.inventory1)
+                            avgInven = totalInven/Bal_stock1_t1
+                            open_cash_t1=state_class_obj.open_cash - state_class_obj.Stock1Price * buyLotSize
                         #needs to be reviewed
                         if(state_class_obj.open_cash<500):
                             reward=-1000
@@ -206,20 +214,27 @@ class Rl():
                         done = True
                         #end episode
                     else:
-                        #print("In sell stock 1")
-                        sellSize = maxSize - buySize
-                        buySize = buySize + 1
-                        tempSale = np.floor(Bal_stock1_t1 / sellSize)
-                        if tempSale == 0: tempSale = 1
                         TotalBought = 0
-                        for j in range(int(tempSale)):
-                            bought_price1 = agent.inventory1.pop(0)
-                            TotalBought = TotalBought + bought_price1
-                            totalInven = totalInven - avgInven
-                        Bal_stock1_t1= len(agent.inventory1)
-                        avgInven = totalInven/Bal_stock1_t1
-                        open_cash_t1 = state_class_obj.open_cash + (state_class_obj.Stock1Price * tempSale) #State[0] is the price of stock 1. Here we are buying 1 stoc
-                  
+                        if saleLotSize == -1:
+                            sellSize = maxSize - buySize
+                            buySize = buySize + 1
+                            tempSale = np.floor(Bal_stock1_t1 / sellSize)
+                            if tempSale == 0: tempSale = 1
+                            for j in range(int(tempSale)):
+                                bought_price1 = agent.inventory1.pop(0)
+                                TotalBought = TotalBought + avgInven
+                                totalInven = totalInven - avgInven
+                            Bal_stock1_t1= len(agent.inventory1)
+                            avgInven = totalInven/Bal_stock1_t1
+                            open_cash_t1 = state_class_obj.open_cash + (state_class_obj.Stock1Price * tempSale) #State[0] is the price of stock 1. Here we are buying 1 stoc
+                        else:
+                            for j in range(int(saleLotSize)):
+                                bought_price1 = agent.inventory1.pop(0)
+                                TotalBought = TotalBought + avgInven
+                                totalInven = totalInven - avgInven
+                            Bal_stock1_t1= len(agent.inventory1)
+                            avgInven = totalInven/Bal_stock1_t1
+                            open_cash_t1 = state_class_obj.open_cash + (state_class_obj.Stock1Price * saleLotSize)
                         # Need to be review
                         # if(state_class_obj.Stock1Blnc<10):
                         #     reward=-100000
@@ -264,8 +279,10 @@ class Rl():
                             if isSellDeafault:
                                 reward=change_percent_stock1*100 #State[0] is the price of stock 1. Here we are buying 1 stock
                     if not done:
-                        total_profit += (tempSale * data1_train[t]) - TotalBought
-                    #print("reward for sell stock1 " + str(reward))
+                        if saleLotSize == -1:
+                            total_profit += (tempSale * data1_train[t]) - TotalBought
+                        else:
+                            total_profit += (saleLotSize * data1_train[t]) - TotalBought
                         
                 if action == 2:             # Do nothing action    
                     isHoldDeafault = True
