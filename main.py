@@ -253,7 +253,7 @@ def getModels():
     models = Model.query.filter_by(user_id=userId).\
         order_by(db.desc(Model.created_at)).all()
     print(len(models))
-    df = pd.DataFrame(columns = ["id","user_id","created_at","updated_at","num_train_date","num_test_date","gamma","epsilon","epsilon_min","epsilon_decay","episode_count","model_name","currency_symobol","start_balance","currency_amount","avg_currency_rate","log_id","model_path","have_model"])
+    df = pd.DataFrame(columns = ["id","user_id","created_at","updated_at","num_train_date","num_test_date","gamma","epsilon","epsilon_min","epsilon_decay","episode_count","model_name","currency_symobol","start_balance","currency_amount","avg_currency_rate","log_id","model_path","have_model","buy_lot_size","sale_lot_size"])
     if len(models) > 0:
         for model in models:
             df = df.append({'id': model.id,'user_id' : model.user_id,'created_at' : model.created_at,'updated_at' : model.updated_at,'num_train_date' : model.num_train_date,'num_test_date' : model.num_test_date,'gamma' : model.gamma,'epsilon' : model.epsilon,'epsilon_min' : model.epsilon_min,'epsilon_decay' : model.epsilon_decay,'episode_count' : model.episode_count,'model_name' : model.model_name,'currency_symobol' : model.currency_symobol,'start_balance' : model.start_balance,'currency_amount' : model.currency_amount,'avg_currency_rate' : model.avg_currency_rate,'log_id' : model.log_id,'model_path' : model.model_path, 'have_model':model.have_model} , ignore_index=True)
@@ -314,7 +314,7 @@ def getModelById():
                     response = app.response_class(
                         response=json.dumps({
                             'status_code': 201,
-                            'res': {'id': model.id,'user_id' : model.user_id,'num_train_date' : model.num_train_date,'num_test_date' : model.num_test_date,'gamma' : model.gamma,'epsilon' : model.epsilon,'epsilon_min' : model.epsilon_min,'epsilon_decay' : model.epsilon_decay,'episode_count' : model.episode_count,'model_name' : model.model_name,'currency_symobol' : model.currency_symobol,'start_balance' : model.start_balance,'currency_amount' : model.currency_amount,'avg_currency_rate' : model.avg_currency_rate,'log_id' : model.log_id,'model_path' : model.model_path, 'start_date': model.start_date.strftime('%Y-%m-%d'), 'end_date':model.end_date.strftime('%Y-%m-%d')}
+                            'res': {'id': model.id,'user_id' : model.user_id,'num_train_date' : model.num_train_date,'num_test_date' : model.num_test_date,'gamma' : model.gamma,'epsilon' : model.epsilon,'epsilon_min' : model.epsilon_min,'epsilon_decay' : model.epsilon_decay,'episode_count' : model.episode_count,'model_name' : model.model_name,'currency_symobol' : model.currency_symobol,'start_balance' : model.start_balance,'currency_amount' : model.currency_amount,'avg_currency_rate' : model.avg_currency_rate,'log_id' : model.log_id,'model_path' : model.model_path, 'start_date': model.start_date.strftime('%Y-%m-%d'), 'end_date':model.end_date.strftime('%Y-%m-%d'),'buy_lot_size':model.buy_lot_size,'sale_lot_size':model.sale_lot_size}
                         }),
                         mimetype='application/json',
                     )
@@ -865,7 +865,7 @@ def saveModel():
                 filter_by(model_name = modelName).first()
                 if md:
                     isParam = True
-                    notFoundParam = 'modelName already exist'
+                    notFoundParam = 'Model Name already exist'
                     isNotError = False
                 else:
                     # Save as new model
