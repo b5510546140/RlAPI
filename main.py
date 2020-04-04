@@ -165,7 +165,7 @@ def createModel():
                 data = []
             if len(data) < trainDay + testDay:
                 if len(data) > 0:
-                    notFoundParam = 'Data Available' + str(len(data))
+                    notFoundParam = 'Unable to process insufficient data ( Data Available: ' + str(len(data)) +')'
                 else: notFoundParam = "No data found, symbol may be delisted"
             else:
                 newLog = Log(user_id = userId, created_at = now, log_text = "", train_text = "", test_text = "")
@@ -410,6 +410,14 @@ def updateModel():
             openclose = "Close"
         else:
             openclose = req['openclose']
+        if 'buyLotSize' not in req:
+            buyLotSize = -1
+        else:
+            buyLotSize = req['buyLotSize']
+        if 'saleLotSize' not in req:
+            saleLotSize = -1
+        else:
+            saleLotSize = req['saleLotSize']
         isParam = False
         isUpdate = False
         isNotError = True
@@ -477,6 +485,8 @@ def updateModel():
                         model.have_model = True
                         model.start_date = newstartDate
                         model.end_date = newendDate
+                        model.buy_lot_size = buyLotSize
+                        model.sale_lot_size = saleLotSize
 
                         Policy.query.filter(Policy.model_id == model.id).delete()
                         for condition in conditions:
@@ -807,6 +817,14 @@ def saveModel():
             conditions = []
         else:
             conditions = req['conditions']
+        if 'buyLotSize' not in req:
+            buyLotSize = -1
+        else:
+            buyLotSize = req['buyLotSize']
+        if 'saleLotSize' not in req:
+            saleLotSize = -1
+        else:
+            saleLotSize = req['saleLotSize']
         isParam = False
         isUpdate = False
         isNotError = True
@@ -844,6 +862,8 @@ def saveModel():
                 model.have_model = False
                 model.start_date = newstartDate
                 model.end_date = newendDate
+                model.buy_lot_size = buyLotSize
+                model.sale_lot_size = saleLotSize
 
                 Policy.query.filter(Policy.model_id == model.id).delete()
                 for condition in conditions:
@@ -869,7 +889,7 @@ def saveModel():
                     isNotError = False
                 else:
                     # Save as new model
-                    new_Rlmodel = Model(user_id = userId, created_at = now, num_train_date = trainDay, num_test_date = testDay,episode_count = episodeCount ,model_name = modelName, currency_symobol = currencySymobol, have_model = False,  start_balance=startBalance, currency_amount = currencyAmount,avg_currency_rate = avgCurrencyRate,gamma = gamma, epsilon= epsilon, epsilon_min=epsilon_min, epsilon_decay=epsilon_decay,start_date= newstartDate,end_date = newendDate, model_path = '')
+                    new_Rlmodel = Model(user_id = userId, created_at = now, num_train_date = trainDay, num_test_date = testDay,episode_count = episodeCount ,model_name = modelName, currency_symobol = currencySymobol, have_model = False,  start_balance=startBalance, currency_amount = currencyAmount,avg_currency_rate = avgCurrencyRate,gamma = gamma, epsilon= epsilon, epsilon_min=epsilon_min, epsilon_decay=epsilon_decay,start_date= newstartDate,end_date = newendDate, model_path = '', buy_lot_size = buyLotSize, sale_lot_size = saleLotSize)
                     db.session.add(new_Rlmodel)
                     db.session.commit()
                     md = Model.query.filter_by(user_id=userId,).\

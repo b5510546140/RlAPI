@@ -64,7 +64,7 @@ class Rl():
         else: isPolicy = False
 
 
-
+        log.log_text = '    ---------- Training ---------- \n'     
         for e in range(episode_count):
             print("..........")
             print("Episode " + str(e+1) + "/" + str(episode_count))
@@ -400,6 +400,7 @@ class Rl():
                 print("Save Done")
                 clear_session()
                 # agent.clearSeassion()
+        log.log_text =  log.log_text + '    ---------- Testing ---------- \n'     
         Rl.testRl(data, currencySymobol, start_balance, training, test, filename, log, currencyAmount = currencyAmount, avgCurrencyRate = avgCurrencyRate)
         return filename
 
@@ -538,6 +539,7 @@ class Rl():
                 # print("Total portfolio value: " + str(next_state_class_obj.portfolio_value)+ 
                     #     "  stock 1 number: " + str(len(agent.inventory1))
                     #      +"  stock 2 number: "+str(len(agent.inventory2))+"  open cash"+str(next_state_class_obj.open_cash))
+                    resultText = resultText + " ---------- Testing Summary On Last day ---------- \n"
                     resultText = resultText + "Total "+ str(currencySymobol)+" in Balance "+ str(Bal_stock1) + "\n Total Open cash in episodes "+ "{0:,.2f}".format(open_cash)+ " \n Total Portfolio value in episodes "+ "{0:,.2f}".format(state_class_obj.portfolio_value) +" \n Total Days in episodes "+ str(t+1) + "\n"+ "Total Profit: " + "{0:,.2f}".format(startPort - state_class_obj.portfolio_value) + "\n"+ "Total Profit %: " + "{0:,.2f}".format((startPort - state_class_obj.portfolio_value)/startPort*100) + " %"
                     if log is not None:
                         log.log_text = log.log_text + resultText
