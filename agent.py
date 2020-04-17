@@ -49,6 +49,10 @@ class Agent:
         options = self.model.predict(state)
         print(str(options))
         return np.argmax(options[0])
+    
+    def getState(self, state):
+        return self.model.predict(state)
+
 
     def expReplay(self, batch_size):
         mini_batch = []

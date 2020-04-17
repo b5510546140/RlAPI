@@ -406,6 +406,8 @@ class Rl():
 
     def testRl(data, currencySymobol, start_balance, training, test, filename, log, priceLook = 'Close', currencyAmount = -1, avgCurrencyRate = -1):
         pd_data1_test=data[training:training+test].reset_index(drop=True)
+        print(pd_data1_test.head())
+        pddates = pd_data1_test['Date']
         data1_test=pd_data1_test[priceLook]
 
         total_Prof=[]
@@ -533,14 +535,15 @@ class Rl():
                 resultText = resultText + "|Balance: "+str(Bal_stock1)+" open_cash: "+"{0:,.2f}".format(open_cash)+"  \n"
                 
                 if done==True:
-                    #print("--------------------------------")
+                    print()
+                    # print(pd_data1_test[t])
                 # print("Total Profit: " + formatPrice(total_profit))
                 # print("Total No. of days played: " + str(t)+ "  out of overall days:  " + str(datasize))
                 # print("Total portfolio value: " + str(next_state_class_obj.portfolio_value)+ 
                     #     "  stock 1 number: " + str(len(agent.inventory1))
                     #      +"  stock 2 number: "+str(len(agent.inventory2))+"  open cash"+str(next_state_class_obj.open_cash))
-                    resultText = resultText + " ---------- Testing Summary On Last day ---------- \n"
-                    resultText = resultText + "Total "+ str(currencySymobol)+" in Balance "+ str(Bal_stock1) + "\n Total Open cash in episodes "+ "{0:,.2f}".format(open_cash)+ " \n Total Portfolio value in episodes "+ "{0:,.2f}".format(state_class_obj.portfolio_value) +" \n Total Days in episodes "+ str(t+1) + "\n"+ "Total Profit: " + "{0:,.2f}".format(startPort - state_class_obj.portfolio_value) + "\n"+ "Total Profit %: " + "{0:,.2f}".format((startPort - state_class_obj.portfolio_value)/startPort*100) + " %"
+                    resultText = resultText + " ---------- Testing Summary On Last day ("+pddates[t].strftime("%x")+")---------- \n"
+                    resultText = resultText + "Total "+ str(currencySymobol)+" in Balance "+ str(Bal_stock1) + "\n Total Open cash in episodes "+ "{0:,.2f}".format(open_cash)+ " \n Total Portfolio value in episodes "+ "{0:,.2f}".format(state_class_obj.portfolio_value) +" \n Total Days in episodes "+ str(t+1) + "\n"+ "Total Profit: " + "{0:,.2f}".format(state_class_obj.portfolio_value - startPort) + "\n"+ "Total Profit %: " + "{0:,.2f}".format((state_class_obj.portfolio_value - startPort)/startPort*100) + " %"
                     if log is not None:
                         log.log_text = log.log_text + resultText
                         db.session.commit()
@@ -589,18 +592,21 @@ class Rl():
                 state_class_obj= State(data1_test, Bal_stock1, open_cash,t)
                 state_array_obj=state_class_obj.getState()
         #         print("State = get State ========")
-        #         print(state_array_obj)
+                # print(state_array_obj)
                 action = agent.act(state_array_obj)
         #         print("Agent .get predict = ")
                 print(agent.getPredict(state_array_obj))
+                statePredict = agent.getState(state_array_obj)
+                print(str(statePredict))
+                print(statePredict[0][0])
                 # print(action)           
-        actionName = ""
+        actionName = "Buy State = "+ str(statePredict[0][0]) + "\n" + "Sell State = "+ str(statePredict[0][1]) +  "\n" + "Hold State = "+ str(statePredict[0][2]) + "\n\n"
         if action == 0:  #buy stock 1
-            actionName = "Buy"
+            actionName = actionName + "Model Suggest to Buy"
         elif action == 1:  #sell stock 1
-            actionName = "Sell"
+            actionName = actionName + "Model Suggest to Sell"
         else:
-            actionName = "Hold"
+            actionName = actionName + "Model Suggest to Hold"
 
         clear_session()
         return actionName
